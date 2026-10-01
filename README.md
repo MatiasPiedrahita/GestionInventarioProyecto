@@ -1,7 +1,9 @@
 # Inventario de repuestos para talleres mecánicos
 
 [![CI](https://github.com/USUARIO/REPOSITORIO/actions/workflows/ci.yml/badge.svg)](https://github.com/USUARIO/REPOSITORIO/actions/workflows/ci.yml)
-
+   ## Roles del equipo en este incremento
+   - **Matías Piedrahita:** implementación de la HU-01 (base de datos, API e interfaz).
+   - **Luis Carlos Moreno:** pipeline de CI, pruebas automatizadas, documentación y revisión del pull request.
 > ⚠️ **Advertencia: este proyecto se desarrolló con apoyo de inteligencia artificial.**
 > Usamos **Claude (Anthropic)** como asistente durante el desarrollo. El detalle de qué se hizo con IA y qué hizo el equipo está en la sección [Declaración de uso de IA](#declaración-de-uso-de-inteligencia-artificial).
 
