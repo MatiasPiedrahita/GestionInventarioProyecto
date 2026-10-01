@@ -1,0 +1,66 @@
+# Pipeline de Integración Continua — Sistema de inventario del taller
+# Se ejecuta en cada push (a cualquier rama) y en cada pull request.
+# Si una prueba falla, el job queda en rojo y el PR no debería fusionarse.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+# Si se hace un push nuevo a la misma rama, se cancela la ejecución anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build y pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias (exactas, desde package-lock.json)
+        run: npm ci
+
+      - name: Build (verificación de sintaxis y construcción de la app)
+        run: npm run build
+
+      - name: Ejecutar pruebas con cobertura
+        run: npm run test:cobertura
+
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-cobertura
+          path: coverage/
+          retention-days: 7
+
+  auditoria:
+    name: Análisis de vulnerabilidades de dependencias
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: npm audit (falla si hay vulnerabilidades altas o críticas)
+        run: npm audit --audit-level=high
