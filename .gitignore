@@ -1,0 +1,23 @@
+# Dependencias
+node_modules/
+
+# Base de datos local (se crea sola al ejecutar el proyecto)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Reportes generados
+coverage/
+
+# Variables de entorno: NUNCA se suben (restan puntos en la rúbrica)
+.env
+.env.*
+!.env.example
+
+# Sistema operativo / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

@@ -1,0 +1,44 @@
+{
+  "name": "taller-inventario",
+  "version": "0.1.0",
+  "description": "Sistema de gestión de inventario con predicción de demanda de repuestos para talleres mecánicos (MVP - HU-01 Gestión de inventario)",
+  "private": true,
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch --env-file-if-exists=.env src/server.js",
+    "build": "node --disable-warning=ExperimentalWarning scripts/build.js",
+    "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",
+    "test:cobertura": "node --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --coverage"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/server.js"
+    ],
+    "coverageReporters": [
+      "text",
+      "lcov"
+    ]
+  },
+  "keywords": [
+    "inventario",
+    "taller",
+    "repuestos",
+    "ingenieria-de-software"
+  ],
+  "author": "Matías Piedrahita, Luis Carlos Moreno",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "supertest": "^7.3.0"
+  }
+}
