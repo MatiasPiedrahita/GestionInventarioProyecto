@@ -140,6 +140,7 @@
                   <th scope="col" class="col-problema">Problema</th>
                   <th scope="col">Mecánico</th>
                   <th scope="col">Estado</th>
+                  <th scope="col" class="col-acciones"><span class="sr-only">Acciones</span></th>
                 </tr>
               </thead>
               <tbody id="cuerpo-ordenes"></tbody>
@@ -242,6 +243,53 @@
       </div>
     </section>
   </div>
+
+  <dialog id="dialogo-orden" class="dialogo-orden" aria-labelledby="titulo-orden">
+    <header class="dialogo-orden__cabecera">
+      <h2 id="titulo-orden">Orden</h2>
+      <span id="estado-orden"></span>
+      <form method="dialog"><button class="boton boton--texto" aria-label="Cerrar detalle">Cerrar</button></form>
+    </header>
+
+    <dl class="ficha" id="ficha-orden"></dl>
+    <p class="problema" id="problema-orden"></p>
+
+    <section class="bloque-orden" aria-labelledby="titulo-repuestos-orden">
+      <h3 id="titulo-repuestos-orden">Repuestos usados</h3>
+      <div class="tabla-contenedor">
+        <table class="tabla-compacta">
+          <thead>
+            <tr>
+              <th scope="col">Repuesto</th>
+              <th scope="col" class="num">Cant.</th>
+              <th scope="col" class="num">Valor unitario</th>
+              <th scope="col" class="num">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo-repuestos-orden"></tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" colspan="3" class="num">Total repuestos</th>
+              <td class="num" id="total-repuestos-orden"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <form id="formulario-repuesto-usado" class="agregar-repuesto" novalidate hidden>
+        <div class="campo campo--crece">
+          <label for="usado-repuesto">Repuesto del inventario</label>
+          <select id="usado-repuesto" name="repuestoId" required></select>
+        </div>
+        <div class="campo campo--cantidad">
+          <label for="usado-cantidad">Cantidad</label>
+          <input id="usado-cantidad" name="cantidad" type="number" min="1" step="1" value="1" inputmode="numeric" required>
+        </div>
+        <button type="submit" class="boton">Registrar y descontar</button>
+      </form>
+      <p class="aviso" id="aviso-repuesto-usado" role="status"></p>
+    </section>
+  </dialog>
 
   <dialog id="dialogo-historial" aria-labelledby="titulo-historial">
     <h2 id="titulo-historial">Historial</h2>
