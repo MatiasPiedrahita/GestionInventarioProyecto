@@ -128,7 +128,35 @@
         <section class="panel panel--tabla" aria-labelledby="titulo-lista-ordenes">
           <div class="barra">
             <h2 id="titulo-lista-ordenes">Órdenes</h2>
+            <p class="detalle" id="info-resultados" aria-live="polite"></p>
           </div>
+          <form class="filtros" id="filtros-ordenes" role="search" aria-label="Filtrar órdenes">
+            <div class="campo">
+              <label for="filtro-placa">Placa exacta</label>
+              <input id="filtro-placa" name="placa" class="placa-input" placeholder="ABC123" autocomplete="off" maxlength="8">
+            </div>
+            <div class="campo">
+              <label for="filtro-cliente">Cliente</label>
+              <input id="filtro-cliente" name="cliente" type="search" placeholder="Nombre o documento" autocomplete="off">
+            </div>
+            <div class="campo" id="campo-filtro-mecanico">
+              <label for="filtro-mecanico">Mecánico</label>
+              <select id="filtro-mecanico" name="mecanicoId">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <div class="campo">
+              <label for="filtro-estado">Estado</label>
+              <select id="filtro-estado" name="estado">
+                <option value="">Todos</option>
+                <option value="ACTIVAS">Activas (en proceso)</option>
+                <option value="HISTORICAS">Históricas</option>
+                <option value="FINALIZADA">Finalizadas</option>
+                <option value="CANCELADA">Canceladas</option>
+              </select>
+            </div>
+            <button type="reset" class="boton boton--texto">Limpiar filtros</button>
+          </form>
           <p class="aviso" id="aviso-lista-ordenes" role="status"></p>
           <div class="tabla-contenedor">
             <table class="tabla-ordenes">
@@ -146,6 +174,11 @@
               <tbody id="cuerpo-ordenes"></tbody>
             </table>
           </div>
+          <nav class="paginacion" aria-label="Páginas del listado">
+            <button type="button" class="boton boton--secundario boton--chico" id="pagina-anterior">Anterior</button>
+            <span id="pagina-actual"></span>
+            <button type="button" class="boton boton--secundario boton--chico" id="pagina-siguiente">Siguiente</button>
+          </nav>
         </section>
       </div>
     </section>

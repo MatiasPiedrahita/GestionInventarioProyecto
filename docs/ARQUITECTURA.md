@@ -4,14 +4,15 @@ Este documento explica **por qué** el código está organizado así. Los diagra
 
 ## Relación con los diagramas
 
-| Diagrama | Qué se implementó en este incremento |
+| Diagrama | Qué está implementado (Sprint 1 y mitad del Sprint 2) |
 |---|---|
-| Clases | `Repuesto` (sku, nombre, costo, stockActual, stockMinimo, proveedor, ubicacion) y `MovimientoInventario` (tipo, cantidad, fecha, stock resultante) |
-| Componentes | Interfaz de usuario → API REST → **Módulo Inventario** → Base de datos |
+| Clases | `Usuario` con rol, `Repuesto`, `MovimientoInventario`, `Cliente`, `Vehiculo`, `OrdenTrabajo` y `DetalleRepuesto` (composición con la orden) |
+| Componentes | Interfaz de usuario → API REST → módulos **Auth**, **Inventario** y **Órdenes** → Base de datos |
 | C4 nivel 2 | Contenedores *SPA Web* (`public/`), *API REST* (`src/`) y *Base de datos* (SQLite) |
-| Casos de uso | "Gestionar inventario de repuestos" con sus `<<include>>`: registrar, consultar, editar/eliminar |
+| Secuencia | El flujo "registrar repuestos y descontar stock" sigue el diagrama: API de órdenes → inventario → base de datos, en una sola transacción |
+| Casos de uso | "Gestionar inventario de repuestos" y su `<<include>>` "Descontar stock" desde la orden |
 
-Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el servicio externo de email/push quedan para historias posteriores.
+Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el servicio externo de email/push corresponden al Sprint 3.
 
 ## Decisiones (ADR resumidos)
 
@@ -51,13 +52,46 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 - La regla se valida en la capa de lógica (`repuesto.validator.js`) con mensajes claros para el usuario.
 - Además, la base de datos tiene restricciones `CHECK (stock_actual >= 0)`, así que ningún camino puede dejar stock negativo, aunque se salte el servicio.
 
-## Requisitos no funcionales cubiertos en este incremento
+### ADR-07 · Migraciones versionadas del esquema
+
+- **Contexto:** cada historia agrega tablas. Los integrantes ya tenían una base local con datos del primer incremento, y no se podía pedir que la borraran.
+- **Decisión:** el esquema vive en archivos numerados (`src/db/migraciones/001_…sql` a `006_…sql`). La versión aplicada se guarda en `PRAGMA user_version`; al abrir la base solo se ejecutan las migraciones pendientes, cada una dentro de una transacción.
+- **Consecuencia:** la migración 004 tuvo que **reconstruir** la tabla de movimientos (SQLite no permite cambiar un `CHECK`), copiando todo el historial. Se probó sobre una base con datos de la versión anterior.
+
+### ADR-08 · Sesiones en base de datos en lugar de JWT
+
+- **Contexto:** el plan de sprints permite "JWT/sesión".
+- **Decisión:** al iniciar sesión se entrega un token aleatorio de 32 bytes. En la base solo se guarda su hash SHA-256, con vencimiento de 8 horas (una jornada de taller).
+- **Motivo:** con sesiones en base de datos, cerrar sesión invalida el token de inmediato; con JWT habría que mantener una lista de revocados. Además no requiere manejar una clave secreta en el servidor, que es justamente lo que la rúbrica pide no subir al repositorio.
+- **Contraseñas:** se guardan con `scrypt` y sal aleatoria. El login responde el mismo mensaje y tarda lo mismo exista o no el usuario, para no revelar qué usuarios existen.
+
+### ADR-09 · Autorización en dos niveles
+
+- **Por rol**, con un middleware en las rutas: por ejemplo, solo dueño y administrador modifican el inventario.
+- **Por propiedad**, en el servicio: un mecánico solo ve y trabaja **sus** órdenes, aunque envíe el id o el filtro de otro mecánico.
+- El frontend oculta menús y botones según el rol, pero solo por comodidad: la API vuelve a verificar todo.
+
+### ADR-10 · Descuento de stock al registrar repuestos en la orden
+
+- **Decisión:** el stock se descuenta en el momento en que el mecánico registra el repuesto en la orden (HU-04), no al finalizarla.
+- **Motivo:** así el inventario refleja de inmediato lo que salió del estante y otro mecánico no puede usar las mismas piezas.
+- **Control de concurrencia:** el `UPDATE` incluye la condición `stock_actual >= cantidad`, así dos registros simultáneos nunca dejan el stock negativo.
+- **Pendiente para la HU "Actualización del estado":** su criterio menciona descontar al finalizar. Como el stock ya se descuenta al registrar, esa historia solo deberá cambiar el estado, sin volver a descontar.
+
+### ADR-11 · Listado paginado con filtros parametrizados e índices
+
+- La consulta se arma solo con los filtros presentes y **siempre con parámetros**, nunca concatenando valores, para evitar inyección SQL.
+- La **placa** se normaliza (`abc-123` → `ABC123`) y se compara con igualdad: devuelve solo coincidencias exactas y usa el índice único de la placa.
+- Hay índices compuestos `(estado, id)` y `(mecanico_id, id)`, que permiten filtrar y ordenar sin recorrer la tabla. Una prueba automática lo verifica con `EXPLAIN QUERY PLAN`.
+- La búsqueda por **nombre de cliente** es parcial (`LIKE '%texto%'`) y no aprovecha índices. Con el volumen de un taller es suficiente; si creciera, el paso natural sería una búsqueda de texto completo (FTS5).
+
+## Requisitos no funcionales cubiertos
 
 | RNF | Cómo se atiende |
 |---|---|
 | Facilidad de uso | Una sola pantalla, mensajes de error junto a cada campo y textos en lenguaje del taller |
-| Velocidad (< 2 s) | Consultas preparadas, índice sobre el historial y base local |
+| Velocidad (< 2 s) | Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
-| Mantenimiento | Capas separadas, código comentado, 28 pruebas y CI |
-| Crecimiento a futuro | Módulos por dominio (`modules/inventario`); los siguientes serán `ordenes`, `alertas` y `prediccion` |
-| Seguridad | **Pendiente:** autenticación y permisos por rol en una próxima historia |
+| Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, 102 pruebas y CI |
+| Crecimiento a futuro | Módulos por dominio (`auth`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
+| Seguridad | Login con contraseñas cifradas, sesiones con vencimiento, permisos por rol y por propiedad en la API, consultas parametrizadas y ningún secreto en el repositorio |

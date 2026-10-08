@@ -70,8 +70,6 @@ function crearRepositorioOrdenes(db) {
       VALUES (@clienteId, @vehiculoId, @mecanicoId, @creadoPor, @descripcion)
     `),
     porId: db.prepare(`${SELECT_ORDEN} WHERE o.id = ?`),
-    listarTodas: db.prepare(`${SELECT_ORDEN} ORDER BY o.id DESC LIMIT 200`),
-    listarDeMecanico: db.prepare(`${SELECT_ORDEN} WHERE o.mecanico_id = ? ORDER BY o.id DESC LIMIT 200`),
     insertarDetalle: db.prepare(`
       INSERT INTO detalle_repuestos (orden_id, repuesto_id, cantidad, costo_unitario, registrado_por)
       VALUES (@ordenId, @repuestoId, @cantidad, @costoUnitario, @registradoPor)
@@ -129,9 +127,50 @@ function crearRepositorioOrdenes(db) {
     buscarPorId(id) {
       return aDominio(sentencias.porId.get(id));
     },
-    listar({ mecanicoId = null } = {}) {
-      const filas = mecanicoId ? sentencias.listarDeMecanico.all(mecanicoId) : sentencias.listarTodas.all();
-      return filas.map(aDominio);
+    /**
+     * Listado con filtros y paginación. La consulta se arma solo con los
+     * filtros presentes y siempre con parámetros (nunca concatenando valores),
+     * así no hay riesgo de inyección SQL.
+     */
+    buscar({ placa, cliente, mecanicoId, estado, pagina, tamano }) {
+      const condiciones = [];
+      const parametros = {};
+
+      if (placa) {
+        condiciones.push('v.placa = @placa');
+        parametros.placa = placa;
+      }
+      if (cliente) {
+        condiciones.push('(c.nombre LIKE @clienteParcial OR c.documento = @cliente)');
+        parametros.clienteParcial = `%${cliente}%`;
+        parametros.cliente = cliente;
+      }
+      if (mecanicoId) {
+        condiciones.push('o.mecanico_id = @mecanicoId');
+        parametros.mecanicoId = mecanicoId;
+      }
+      if (estado === 'ACTIVAS') {
+        condiciones.push("o.estado = 'EN_PROCESO'");
+      } else if (estado === 'HISTORICAS') {
+        condiciones.push("o.estado IN ('FINALIZADA', 'CANCELADA')");
+      } else if (estado) {
+        condiciones.push('o.estado = @estado');
+        parametros.estado = estado;
+      }
+
+      const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
+      const desde = `
+        FROM ordenes o
+        JOIN clientes  c ON c.id = o.cliente_id
+        JOIN vehiculos v ON v.id = o.vehiculo_id
+        ${where}`;
+
+      const { total } = db.prepare(`SELECT COUNT(*) AS total ${desde}`).get(parametros);
+      const filas = db
+        .prepare(`${SELECT_ORDEN} ${where} ORDER BY o.id DESC LIMIT @limite OFFSET @desplazamiento`)
+        .all({ ...parametros, limite: tamano, desplazamiento: (pagina - 1) * tamano });
+
+      return { datos: filas.map(aDominio), total };
     },
     insertarDetalle(datos) {
       sentencias.insertarDetalle.run(datos);

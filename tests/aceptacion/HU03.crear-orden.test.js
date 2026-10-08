@@ -16,7 +16,7 @@ describe('HU-03 · Criterio de aceptación: la orden creada aparece en el listad
     // Dado
     const ctx = crearContexto();
     const mecanico = ctx.como('mecanico');
-    expect((await mecanico.get('/api/ordenes')).body).toHaveLength(0);
+    expect((await mecanico.get('/api/ordenes')).body.datos).toHaveLength(0);
 
     // Cuando
     const creada = await mecanico.post('/api/ordenes').send(ordenValida());
@@ -24,8 +24,8 @@ describe('HU-03 · Criterio de aceptación: la orden creada aparece en el listad
     // Entonces
     expect(creada.status).toBe(201);
     const listado = await mecanico.get('/api/ordenes');
-    expect(listado.body).toHaveLength(1);
-    expect(listado.body[0]).toMatchObject({
+    expect(listado.body.datos).toHaveLength(1);
+    expect(listado.body.datos[0]).toMatchObject({
       id: creada.body.id,
       estadoNombre: 'En proceso',
       vehiculo: { placa: 'ABC123' },
@@ -48,6 +48,6 @@ describe('HU-03 · Criterio de aceptación: la orden creada aparece en el listad
     // Entonces
     expect(res.status).toBe(400);
     expect(res.body.detalles.map((d) => d.campo)).toEqual(expect.arrayContaining(['vehiculo.placa', 'descripcion']));
-    expect((await mecanico.get('/api/ordenes')).body).toHaveLength(0);
+    expect((await mecanico.get('/api/ordenes')).body.datos).toHaveLength(0);
   });
 });

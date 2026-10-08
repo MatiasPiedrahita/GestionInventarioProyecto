@@ -1,40 +1,55 @@
-# Inventario de repuestos para talleres mecánicos
+# Gestión de inventario y órdenes para talleres mecánicos
 
-   ## Roles del equipo en este incremento
-   - **Matías Piedrahita:** implementación de la HU-01 (base de datos, API e interfaz).
-   - **Luis Carlos Moreno:** pipeline de CI, pruebas automatizadas, documentación y revisión del pull request.
+[![CI](https://github.com/MatiasPiedrahita/GestionInventarioProyecto/actions/workflows/ci.yml/badge.svg)](https://github.com/MatiasPiedrahita/GestionInventarioProyecto/actions/workflows/ci.yml)
+
 > ⚠️ **Advertencia: este proyecto se desarrolló con apoyo de inteligencia artificial.**
 > Usamos **Claude (Anthropic)** como asistente durante el desarrollo. El detalle de qué se hizo con IA y qué hizo el equipo está en la sección [Declaración de uso de IA](#declaración-de-uso-de-inteligencia-artificial).
 
-Proyecto de semestre de **Ingeniería de Software (UPB, 2026-2)**. Es una aplicación web para que los talleres mecánicos pequeños y medianos dejen de llevar el inventario en cuadernos, hojas de Excel sueltas o mensajes de WhatsApp. Este repositorio contiene el primer incremento funcional (MVP) del sistema: **la gestión del inventario de repuestos**.
+Proyecto de semestre de **Ingeniería de Software (UPB, 2026-2)**. Es una aplicación web para que los talleres mecánicos pequeños y medianos dejen de llevar el inventario y las órdenes de trabajo en cuadernos, hojas de Excel sueltas o mensajes de WhatsApp.
 
 **Equipo:** Matías Piedrahita · Luis Carlos Moreno
 
 ---
 
-## Historia de usuario implementada
+## Estado del proyecto
 
-| | |
-|---|---|
-| **ID** | HU-01 (prioridad MoSCoW: **Must**) |
-| **Historia** | *Como* dueño del taller, *quiero* gestionar el inventario de repuestos, *para* controlar el stock. |
-| **Criterio de aceptación** | CRUD completo de repuestos (SKU, costo, stock, ubicación) y carga masiva por CSV. El sistema **no permite stock negativo ni campos obligatorios vacíos** al guardar. |
+El repositorio cubre el **Sprint 1 completo** y la **primera mitad del Sprint 2** del plan de trabajo.
 
-### Criterio en formato Dado / Cuando / Entonces
+| Sprint | ID | Historia de usuario | Rol | Estado |
+|---|---|---|---|---|
+| 1 | HU-02 | Iniciar sesión | Todos | ✅ |
+| 1 | HU-01 | Gestión de inventario de repuestos | Dueño | ✅ |
+| 1 | HU-03 | Crear orden de reparación | Mecánico | ✅ |
+| 2 | HU-04 | Registrar repuestos usados en una reparación | Mecánico | ✅ |
+| 2 | HU-05 | Agregar notas o detalles de la reparación | Mecánico | ✅ |
+| 2 | HU-06 | Ver listado de órdenes de trabajo | Recepcionista | ✅ |
+| 2 | — | Actualización del estado de órdenes | Mecánico | Pendiente |
+| 3 | — | Alertas de stock bajo | Dueño | Pendiente |
+| 3 | — | Predicción de demanda de repuestos | Administrador | Pendiente |
 
-Este criterio de la Entrega 1 se convirtió casi literalmente en la prueba [`tests/aceptacion/HU01.criterio-aceptacion.test.js`](tests/aceptacion/HU01.criterio-aceptacion.test.js):
+### Criterios de aceptación y su prueba automática
 
-- **Dado** un inventario vacío, **cuando** el dueño intenta guardar un repuesto con stock negativo, **entonces** el sistema lo rechaza y el inventario sigue vacío.
-- **Dado** un inventario vacío, **cuando** intenta guardar un repuesto sin SKU ni nombre, **entonces** el sistema indica cada campo obligatorio que falta y no guarda nada.
-- **Dado** un repuesto con 10 unidades, **cuando** intenta editarlo dejando el stock en -1, **entonces** se rechaza el cambio y el stock sigue en 10.
+Cada historia tiene una prueba de aceptación escrita como **Dado / Cuando / Entonces**. Esa prueba es la traducción directa de la "prueba de funcionalidad" del plan de sprints.
 
-### Qué puede hacer el usuario
+| Historia | Prueba de funcionalidad del plan | Archivo |
+|---|---|---|
+| HU-01 Inventario | No permitir stock negativo ni campos obligatorios vacíos | `tests/aceptacion/HU01.criterio-aceptacion.test.js` |
+| HU-02 Iniciar sesión | Un mecánico no puede acceder a las vistas exclusivas del dueño | `tests/aceptacion/HU02.iniciar-sesion.test.js` |
+| HU-03 Crear orden | La orden creada aparece en el listado con estado "En proceso" | `tests/aceptacion/HU03.crear-orden.test.js` |
+| HU-04 Repuestos usados | Registrar 2 unidades reduce el stock en 2 | `tests/aceptacion/HU04.registrar-repuestos-usados.test.js` |
+| HU-05 Notas | La nota se guarda y se ve igual al recargar | `tests/aceptacion/HU05.notas-de-reparacion.test.js` |
+| HU-06 Listado | Filtrar por placa devuelve solo coincidencias exactas | `tests/aceptacion/HU06.listado-ordenes.test.js` |
 
-- Registrar, consultar, editar y dar de baja repuestos. La baja es lógica: el repuesto sale del catálogo, pero su historial se conserva.
-- Buscar por SKU, nombre o proveedor, y filtrar los repuestos que están en el mínimo o por debajo de él.
-- Ver el nivel de stock de cada repuesto en una barra con la marca del mínimo.
-- Importar repuestos de forma masiva desde un CSV. Si una sola fila tiene un error, no se carga ninguna y se indica el error de cada fila.
-- Consultar el historial de movimientos de cada repuesto (alta, ajustes, baja, carga por CSV). Ese historial será la base del módulo de predicción de demanda.
+### Qué puede hacer cada rol
+
+| Rol | Al iniciar sesión entra a | Puede |
+|---|---|---|
+| **Dueño del taller** | Inventario | Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas |
+| **Administrador** | Inventario | Lo mismo que el dueño. La predicción de demanda llegará en el Sprint 3 |
+| **Mecánico** | Órdenes de trabajo | Crear órdenes, que quedan a su nombre. Ver **solo sus** órdenes. Registrar repuestos usados (se descuentan del stock) y escribir notas de la reparación. Consultar el inventario, pero no modificarlo |
+| **Recepcionista** | Órdenes de trabajo | Consultar el listado global con filtros por placa, cliente, mecánico y estado. No puede modificar nada |
+
+La interfaz oculta lo que cada rol no puede usar, pero **la seguridad real está en la API**: cada petición verifica la sesión y el rol, y responde `401` o `403` si no corresponde.
 
 ---
 
@@ -48,25 +63,40 @@ Este criterio de la Entrega 1 se convirtió casi literalmente en la prueba [`tes
 | npm | viene con Node | `npm -v` |
 | Git | cualquiera reciente | `git --version` |
 
-No hace falta instalar ninguna base de datos. El proyecto usa SQLite a través del módulo `node:sqlite` que ya trae Node.js, así que no hay que compilar nada ni instalar un motor aparte.
+No hace falta instalar ninguna base de datos. El proyecto usa SQLite a través del módulo `node:sqlite` que ya trae Node.js.
 
 ### 2. Clonar e instalar
 
 ```bash
-git clone https://github.com/USUARIO/REPOSITORIO.git
-cd REPOSITORIO
+git clone https://github.com/MatiasPiedrahita/GestionInventarioProyecto.git
+cd GestionInventarioProyecto
 npm ci
 ```
 
-> `npm ci` instala exactamente las versiones que están en `package-lock.json`, igual que el pipeline.
-
-### 3. (Opcional) Cargar datos de ejemplo
+### 3. Cargar datos de ejemplo y crear usuarios
 
 ```bash
 npm run seed
 ```
 
-Carga los 6 repuestos de [`ejemplos/repuestos-ejemplo.csv`](ejemplos/repuestos-ejemplo.csv). Puede ejecutarse varias veces sin duplicar datos.
+Crea 6 repuestos, 12 órdenes de ejemplo y estos usuarios:
+
+| Usuario | Rol |
+|---|---|
+| `dueno` | Dueño del taller |
+| `admin` | Administrador |
+| `mecanico1`, `mecanico2` | Mecánico |
+| `recepcion` | Recepcionista |
+
+**Contraseñas:** por seguridad no están en el repositorio. El seed genera una contraseña aleatoria por usuario y **la muestra una sola vez en la consola**; anótala. Si prefieren una contraseña común para pruebas, copien `.env.example` como `.env` y escriban un valor en `DEMO_PASSWORD` **antes** de correr el seed. El archivo `.env` nunca se sube al repositorio.
+
+El seed se puede correr varias veces: no duplica nada.
+
+Para crear otro usuario:
+
+```bash
+npm run usuario:crear -- --usuario luis --nombre "Luis Carlos" --rol mecanico --password "una-clave-de-8-o-mas"
+```
 
 ### 4. Ejecutar
 
@@ -74,46 +104,37 @@ Carga los 6 repuestos de [`ejemplos/repuestos-ejemplo.csv`](ejemplos/repuestos-e
 npm start
 ```
 
-Abra **http://localhost:3000** en el navegador. La base de datos se crea automáticamente en `data/inventario.db`.
+Abra **http://localhost:3000** e inicie sesión. La base de datos se crea en `data/inventario.db`.
 
-Si quiere cambiar el puerto o la ruta de la base, copie `.env.example` como `.env` y ajuste los valores. El archivo `.env` nunca se sube al repositorio.
+> **Si ya tenían una base de datos de la versión anterior**, no hay que borrarla. Al arrancar, el sistema aplica solo las migraciones que le faltan y conserva el inventario y su historial.
 
-### 5. Probar la carga masiva
+### 5. Recorrido sugerido para probar a mano
 
-En la interfaz, pulse **Importar CSV** y elija [`ejemplos/repuestos-ejemplo.csv`](ejemplos/repuestos-ejemplo.csv). Se aceptan archivos separados por `;` (así exporta Excel en español) o por `,`. Las columnas son:
-
-```
-sku;nombre;costo;stock_actual;stock_minimo;proveedor;ubicacion
-```
-
-`sku`, `nombre`, `costo` y `stock_actual` son obligatorias. `stock_minimo` vale 0 por defecto.
+1. Entrar como **`mecanico1`**: llega a "Mis órdenes". Crear una orden con la placa `abc123`.
+2. Abrir la orden y registrar 2 unidades de un repuesto: el texto del selector muestra cómo baja el stock.
+3. Escribir una nota, guardarla y recargar la página: la nota sigue ahí.
+4. Intentar entrar a `http://localhost:3000/#inventario`: lo devuelve a órdenes, porque no es su vista.
+5. Entrar como **`recepcion`**: filtrar por placa `ABC123` (solo salen esas), por estado "Históricas" y por mecánico.
+6. Entrar como **`dueno`**: en Inventario, abrir el historial del repuesto usado y ver el movimiento "Usado en la orden #N".
 
 ---
 
 ## Cómo correr las pruebas
 
-Todas las pruebas corren con **un solo comando**:
-
 ```bash
-npm test
+npm test                 # todas las pruebas
+npm run test:cobertura   # con reporte de cobertura
 ```
 
-Para ver además el reporte de cobertura:
+Resultado actual: **102 pruebas en 18 suites, todas en verde.**
 
-```bash
-npm run test:cobertura
-```
-
-| Suite | Tipo | Qué verifica |
+| Tipo | Carpeta | Qué verifican |
 |---|---|---|
-| `tests/aceptacion/HU01.criterio-aceptacion.test.js` | Aceptación | Los 3 escenarios Dado/Cuando/Entonces del criterio de la HU-01 |
-| `tests/integration/repuestos.api.test.js` | Integración | La API completa (HTTP, lógica y base de datos en memoria): CRUD, SKU único, filtros, historial, CSV "todo o nada", errores 400/404/409 |
-| `tests/unit/repuesto.validator.test.js` | Unitaria | Reglas de validación: obligatorios, negativos, enteros, límites, normalización |
-| `tests/unit/csv.test.js` | Unitaria | Lectura de CSV con `;` o `,`, comillas, BOM de Excel y filas vacías |
+| Aceptación | `tests/aceptacion/` | Un archivo por historia, con escenarios Dado/Cuando/Entonces |
+| Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, filtros, paginación e índices |
+| Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros), lector de CSV y hash de contraseñas |
 
-Resultado actual: **28 pruebas, 4 suites, todas en verde** (cobertura de líneas ≈ 95 %).
-
-Cada prueba crea su propia base de datos en memoria, así que las pruebas no dependen unas de otras ni de los datos locales.
+Cada prueba crea su propia base de datos en memoria y sus propios usuarios (`tests/helpers/contexto.js`), así que las pruebas no dependen unas de otras.
 
 ---
 
@@ -124,103 +145,109 @@ Archivo: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Se ejecuta en *
 | Job | Pasos |
 |---|---|
 | **Build y pruebas** | `npm ci` → `npm run build` (verifica la sintaxis de todos los archivos y que la app se construya) → `npm run test:cobertura` → publica el reporte de cobertura como artefacto |
-| **Análisis de vulnerabilidades** | `npm ci` → `npm audit --audit-level=high` (falla si alguna dependencia tiene vulnerabilidades altas o críticas) |
-
-La versión de Node queda fijada en 22 dentro del workflow, para evitar el problema de "en mi máquina sí pasa".
-
-**Estado:** ver el badge al inicio de este README o la pestaña **Actions** del repositorio.
+| **Análisis de vulnerabilidades** | `npm ci` → `npm audit --audit-level=high` |
 
 ---
 
 ## Arquitectura
 
-La aplicación sigue una arquitectura **por capas**, la misma de los diagramas de componentes y del C4 nivel 2 del proyecto. Cada capa solo conoce a la capa de abajo:
+Arquitectura **por capas y por módulos de dominio**, la misma de los diagramas de componentes y del C4 nivel 2 del proyecto:
 
 ```
-Navegador (public/)            HTML + CSS + JavaScript, consume la API REST
-        │  HTTP / JSON
+Navegador (public/)        Login, menú por rol y vistas (inventario, órdenes)
+        │  HTTP / JSON + Authorization: Bearer <token>
         ▼
-Rutas (repuesto.routes.js)     Traduce HTTP ↔ servicio. Sin reglas de negocio
+Middleware de sesión y rol (modules/auth)   401 sin sesión, 403 sin permiso
         ▼
-Servicio (repuesto.service.js) Reglas: SKU único, historial, transacciones, CSV todo-o-nada
-        │       └─ Validador (repuesto.validator.js): función pura, criterio de aceptación
+Rutas → Servicios → Repositorios            por módulo: auth, inventario, ordenes
         ▼
-Repositorio (repuesto.repository.js)  Único archivo con SQL
-        ▼
-SQLite (schema.sql)            Tablas repuestos y movimientos_inventario
+SQLite + migraciones versionadas (src/db/migraciones/001…006)
 ```
 
 ```
-.
-├── .github/
-│   ├── workflows/ci.yml            Pipeline de CI
-│   └── pull_request_template.md
-├── docs/
-│   ├── ARQUITECTURA.md             Decisiones técnicas y su justificación
-│   └── GUIA_TALLER.md              Roles, flujo de ramas/commits y checklist del taller
-├── ejemplos/repuestos-ejemplo.csv
-├── public/                         Interfaz web
-├── scripts/
-│   ├── build.js                    Paso de build del pipeline
-│   └── seed.js                     Datos de ejemplo
-├── src/
-│   ├── app.js                      Construye la app (recibe la BD por parámetro)
-│   ├── server.js                   Punto de entrada
-│   ├── db/                         Conexión y esquema
-│   ├── modules/inventario/         Validador, CSV, repositorio, servicio y rutas
-│   └── shared/                     Errores de dominio y manejador de errores
-└── tests/
-    ├── aceptacion/
-    ├── integration/
-    └── unit/
+src/
+├── app.js                       Composición de módulos y permisos por rol
+├── server.js
+├── db/
+│   ├── connection.js            Aplica las migraciones pendientes al abrir la base
+│   └── migraciones/             001 inventario · 002 usuarios y sesiones · 003 órdenes
+│                                004 repuestos usados · 005 notas · 006 índices
+├── modules/
+│   ├── auth/                    Roles, contraseñas, sesiones, middleware y rutas
+│   ├── inventario/              Repuestos, CSV e historial de movimientos
+│   └── ordenes/                 Órdenes, clientes, vehículos, repuestos usados, notas y filtros
+└── shared/                      Errores de dominio y manejador de errores
+public/
+├── index.html, styles.css
+└── js/                          api.js (token), comun.js, app.js (enrutador por rol), vistas/
+tests/
+├── aceptacion/  integration/  unit/  helpers/
+scripts/
+└── build.js · seed.js · crear-usuario.js
 ```
 
-Las decisiones de diseño (por qué SQLite en esta etapa, por qué bajas lógicas, por qué inyección de la base de datos, etc.) están en [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+Las decisiones de diseño están en [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
 
 ### API REST
 
-| Método | Ruta | Descripción | Respuestas |
+Todas las rutas, salvo `/api/salud` y `/api/auth/login`, exigen la cabecera `Authorization: Bearer <token>`.
+
+| Método | Ruta | Quién | Descripción |
 |---|---|---|---|
-| GET | `/api/salud` | Verifica que el servidor esté arriba | 200 |
-| GET | `/api/repuestos?q=&bajoStock=true` | Lista los repuestos activos, con búsqueda y filtro opcionales | 200 |
-| GET | `/api/repuestos/:id` | Consulta un repuesto | 200, 404 |
-| POST | `/api/repuestos` | Crea un repuesto | 201, 400, 409 |
-| PUT | `/api/repuestos/:id` | Edita un repuesto (registra un AJUSTE si cambia el stock) | 200, 400, 404, 409 |
-| DELETE | `/api/repuestos/:id` | Da de baja el repuesto (baja lógica) | 204, 404 |
-| GET | `/api/repuestos/:id/movimientos` | Historial del repuesto | 200, 404 |
-| POST | `/api/repuestos/importar` | Carga masiva (`Content-Type: text/csv`) | 201, 400 |
+| POST | `/api/auth/login` | Público | Inicia sesión: devuelve token, usuario y vista inicial según el rol |
+| POST | `/api/auth/logout` | Con sesión | Cierra la sesión (el token deja de servir) |
+| GET | `/api/auth/yo` | Con sesión | Usuario de la sesión actual |
+| GET | `/api/repuestos?q=&bajoStock=true` | Con sesión | Catálogo de repuestos |
+| GET | `/api/repuestos/:id` | Con sesión | Un repuesto |
+| POST · PUT · DELETE | `/api/repuestos[/:id]` | Dueño, admin | Crear, editar, dar de baja |
+| POST | `/api/repuestos/importar` | Dueño, admin | Carga masiva por CSV |
+| GET | `/api/repuestos/:id/movimientos` | Dueño, admin | Historial del repuesto |
+| GET | `/api/usuarios/mecanicos` | Con sesión | Mecánicos activos |
+| GET | `/api/ordenes?placa=&cliente=&mecanicoId=&estado=&pagina=&tamano=` | Con sesión | Listado paginado. `estado`: `ACTIVAS`, `HISTORICAS`, `EN_PROCESO`, `FINALIZADA` o `CANCELADA`. El mecánico solo recibe las suyas |
+| POST | `/api/ordenes` | Mecánico, dueño, admin | Crea una orden en estado "En proceso" |
+| GET | `/api/ordenes/:id` | Con sesión (el mecánico, solo las suyas) | Detalle con repuestos usados, total y notas |
+| POST | `/api/ordenes/:id/repuestos` | Mecánico (suyas), dueño, admin | Registra repuestos usados y descuenta stock |
+| PATCH | `/api/ordenes/:id/notas` | Mecánico (suyas), dueño, admin | Guarda las notas de la reparación |
 
 Todos los errores tienen la misma forma:
 
 ```json
-{
-  "error": "VALIDACION",
-  "mensaje": "Los datos enviados no son válidos",
-  "detalles": [{ "campo": "stockActual", "mensaje": "El stock actual no puede ser negativo" }]
-}
+{ "error": "VALIDACION", "mensaje": "Los datos enviados no son válidos", "detalles": [{ "campo": "vehiculo.placa", "mensaje": "La placa es obligatoria" }] }
 ```
 
+| Código | Significado |
+|---|---|
+| 400 | Datos inválidos (`VALIDACION`) |
+| 401 | Sin sesión o sesión vencida (`NO_AUTENTICADO`) |
+| 403 | El rol no tiene permiso (`SIN_PERMISO`) |
+| 404 | No existe (`NO_ENCONTRADO`) |
+| 409 | Conflicto: SKU repetido, stock insuficiente u orden que ya no está en proceso (`CONFLICTO`) |
+
 ---
 
-## Flujo de trabajo del equipo
+## Equipo y flujo de trabajo
+
+### Reparto de tareas
+
+Según el plan de sprints:
+
+| Historia | Matías Piedrahita | Luis Carlos Moreno |
+|---|---|---|
+| Iniciar sesión | Endpoint de autenticación, redirección por rol | Tabla de usuarios, formulario de login |
+| Gestión de inventario | Tablas de repuestos e historial, formulario y tabla | API REST CRUD, carga masiva por CSV |
+| Crear orden | Endpoint de creación | Tablas de órdenes, clientes y vehículos, formulario |
+| Repuestos usados | Tabla de detalle, selector en el frontend | Endpoint con descuento de stock |
+| Notas | Endpoint de notas | Campo en la tabla de órdenes, campo de texto |
+| Listado de órdenes | Índices, tabla con barra de búsqueda | API con paginación y filtros |
+
+El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests se trabajaron entre los dos.
+
+### Flujo
 
 - `main` siempre debe estar en verde. Nadie hace push directo a `main`.
-- **Una rama por historia:** `feature/HU-01-gestion-inventario`. La configuración del pipeline va en `ci/pipeline-inicial`.
-- Todo cambio entra a `main` por **pull request**, que debe tener el CI en verde y la aprobación del otro integrante.
-- Los commits son pequeños y descriptivos (`feat:`, `test:`, `ci:`, `docs:`, `fix:`).
-
-El paso a paso del taller está en [`docs/GUIA_TALLER.md`](docs/GUIA_TALLER.md).
-
----
-
-## Fuera del alcance de este incremento
-
-Estas funciones se trabajarán en las siguientes historias del backlog:
-
-- Alertas automáticas de stock bajo por email o push (HU Must). Por ahora la interfaz ya resalta lo que está en el mínimo.
-- Órdenes de trabajo y descuento automático de stock (HU Must).
-- Autenticación y permisos por rol (requisito no funcional de seguridad).
-- Predicción de demanda (HU Should).
+- **Una rama por historia:** `feature/HU-02-iniciar-sesion`, `feature/HU-03-crear-orden`, etc.
+- Todo cambio entra por **pull request** con el CI en verde, y se fusiona con *Create a merge commit* para conservar el historial de commits.
+- Commits pequeños con prefijo: `feat:`, `test:`, `fix:`, `docs:`, `ci:`.
 
 ---
 
@@ -233,16 +260,16 @@ Estas funciones se trabajarán en las siguientes historias del backlog:
 **Para qué la usamos:**
 
 - Proponer la arquitectura por capas y la estructura de carpetas a partir de nuestros diagramas (clases, componentes, C4).
-- Generar el código base de la HU-01: validador, lector de CSV, repositorio, servicio, rutas e interfaz web.
-- Escribir las pruebas automatizadas, incluida la traducción del criterio de aceptación a escenarios Dado/Cuando/Entonces.
+- Generar el código de las historias HU-01 a HU-06: autenticación y roles, inventario, órdenes, repuestos usados, notas, listado con filtros, migraciones de la base de datos e interfaz web.
+- Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.
 - Redactar este README y la documentación en `docs/`.
 
 **Qué hizo el equipo:**
 
-- Definir el problema, las historias de usuario, la priorización MoSCoW y los criterios de aceptación (Entrega 1).
+- Definir el problema, las historias de usuario, la priorización MoSCoW, los criterios de aceptación y el plan de sprints con su reparto de tareas.
 - Revisar, ejecutar y entender todo el código generado antes de subirlo, y ajustarlo donde fue necesario.
-- Organizar el trabajo en ramas, commits y pull requests, y revisar el código del compañero.
+- Organizar el trabajo en ramas, commits y pull requests, y revisar el código.
 
 **Responsabilidad:** el equipo entiende el código entregado, puede explicarlo y es responsable de su contenido. La IA se usó como apoyo y no reemplazó nuestro criterio ni nuestra revisión.
 

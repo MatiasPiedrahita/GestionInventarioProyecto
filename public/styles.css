@@ -407,3 +407,33 @@ textarea[aria-invalid='true'], select[aria-invalid='true'] { border-color: var(-
   flex-wrap: wrap;
 }
 .notas-pie .detalle { margin: 0; }
+
+/* ===================== Listado con filtros y paginación (HU-06) ===================== */
+.filtros {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(150px, 1.4fr) minmax(130px, 1fr) minmax(150px, 1fr) auto;
+  gap: 0.5rem 0.75rem;
+  align-items: end;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--fondo);
+  border-radius: var(--radio-control);
+}
+.filtros .campo { margin-bottom: 0; }
+.filtros label { font-size: 0.8rem; color: var(--tinta-suave); }
+.filtros .boton--texto { padding-left: 0.25rem; padding-right: 0.25rem; }
+#info-resultados { margin: 0; }
+
+.paginacion {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+.boton:disabled { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 1100px) {
+  .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

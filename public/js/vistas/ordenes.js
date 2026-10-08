@@ -3,7 +3,7 @@
  * Vista "Órdenes de trabajo".
  * - Mecánico: crea órdenes (quedan a su nombre) y ve solo las suyas.
  * - Dueño y administrador: crean órdenes eligiendo el mecánico y ven todas.
- * - Recepcionista: solo consulta el listado.
+ * - Recepcionista: consulta el listado global con filtros (HU-06), sin modificar nada.
  */
 window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
   const { api, dom, formato } = window.Taller;
@@ -74,44 +74,88 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
     return fila;
   }
 
-  function pintar(ordenes) {
-    cuerpo.replaceChildren();
-    const enProceso = ordenes.filter((o) => o.estado === 'EN_PROCESO').length;
-    $('#resumen-ordenes').textContent = ordenes.length === 0
-      ? 'Todavía no hay órdenes registradas.'
-      : `${ordenes.length} ${ordenes.length === 1 ? 'orden' : 'órdenes'}, ${enProceso} en proceso.`;
+  // ----------------------------------------------- Listado, filtros y páginas
+  const formularioFiltros = $('#filtros-ordenes');
+  let pagina = 1;
 
-    if (ordenes.length === 0) {
+  function hayFiltros() {
+    return [...new FormData(formularioFiltros).values()].some((v) => String(v).trim() !== '');
+  }
+
+  function pintar(resultado) {
+    const { datos, total, totalPaginas } = resultado;
+    cuerpo.replaceChildren();
+    avisoLista.textContent = '';
+
+    const desde = total === 0 ? 0 : (resultado.pagina - 1) * resultado.tamano + 1;
+    const hasta = (resultado.pagina - 1) * resultado.tamano + datos.length;
+    $('#info-resultados').textContent = total === 0 ? '' : `Mostrando ${desde} a ${hasta} de ${total}`;
+    $('#pagina-actual').textContent = `Página ${resultado.pagina} de ${totalPaginas}`;
+    $('#pagina-anterior').disabled = resultado.pagina <= 1;
+    $('#pagina-siguiente').disabled = resultado.pagina >= totalPaginas;
+    $('.paginacion').hidden = totalPaginas <= 1;
+
+    if (datos.length === 0) {
       const fila = dom.crear('tr');
-      const celda = dom.crear('td', {
-        clase: 'vacio',
-        texto: puedeCrear() ? 'No hay órdenes todavía. Registra la primera con el formulario.' : 'No hay órdenes registradas.',
-      });
+      let texto = 'No hay órdenes registradas.';
+      if (hayFiltros()) texto = 'Ninguna orden coincide con los filtros. Revisa la placa completa o limpia los filtros.';
+      else if (puedeCrear()) texto = 'No hay órdenes todavía. Registra la primera con el formulario.';
+      const celda = dom.crear('td', { clase: 'vacio', texto });
       celda.colSpan = 7;
       fila.appendChild(celda);
       cuerpo.appendChild(fila);
       return;
     }
-    ordenes.forEach((orden) => cuerpo.appendChild(construirFila(orden)));
+    datos.forEach((orden) => cuerpo.appendChild(construirFila(orden)));
+  }
+
+  async function actualizarResumen() {
+    const activas = await api.pedir('/api/ordenes?estado=ACTIVAS&tamano=1');
+    const todas = await api.pedir('/api/ordenes?tamano=1');
+    $('#resumen-ordenes').textContent = todas.total === 0
+      ? 'Todavía no hay órdenes registradas.'
+      : `${todas.total} ${todas.total === 1 ? 'orden' : 'órdenes'} en total, ${activas.total} activas.`;
   }
 
   async function cargar() {
+    const parametros = new URLSearchParams();
+    new FormData(formularioFiltros).forEach((valor, clave) => {
+      if (String(valor).trim() !== '') parametros.set(clave, String(valor).trim());
+    });
+    parametros.set('pagina', pagina);
     try {
-      pintar(await api.pedir('/api/ordenes'));
+      pintar(await api.pedir(`/api/ordenes?${parametros}`));
+      await actualizarResumen();
     } catch (error) {
-      dom.aviso(avisoLista, `No se pudieron cargar las órdenes: ${error.message}`, 'error');
+      dom.aviso(avisoLista, `No se pudieron cargar las órdenes: ${error.message}`, 'error', error.detalles || []);
     }
   }
 
+  let temporizador;
+  function filtrarPronto() {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(() => { pagina = 1; cargar(); }, 300);
+  }
+  formularioFiltros.addEventListener('input', filtrarPronto);
+  formularioFiltros.addEventListener('submit', (evento) => { evento.preventDefault(); pagina = 1; cargar(); });
+  formularioFiltros.addEventListener('reset', () => setTimeout(() => { pagina = 1; cargar(); }, 0));
+  $('#filtro-placa').addEventListener('input', (evento) => { evento.target.value = evento.target.value.toUpperCase(); });
+  $('#pagina-anterior').addEventListener('click', () => { pagina -= 1; cargar(); });
+  $('#pagina-siguiente').addEventListener('click', () => { pagina += 1; cargar(); });
+
   async function cargarMecanicos() {
     const mecanicos = await api.pedir('/api/usuarios/mecanicos');
-    selectMecanico.replaceChildren(dom.crear('option', { texto: 'Selecciona un mecánico' }));
-    selectMecanico.firstChild.value = '';
-    mecanicos.forEach((m) => {
-      const opcion = dom.crear('option', { texto: m.nombre });
-      opcion.value = m.id;
-      selectMecanico.appendChild(opcion);
-    });
+    const llenar = (select, textoVacio) => {
+      select.replaceChildren(dom.crear('option', { texto: textoVacio }));
+      select.firstChild.value = '';
+      mecanicos.forEach((m) => {
+        const opcion = dom.crear('option', { texto: m.nombre });
+        opcion.value = m.id;
+        select.appendChild(opcion);
+      });
+    };
+    llenar(selectMecanico, 'Selecciona un mecánico');
+    llenar($('#filtro-mecanico'), 'Todos');
   }
 
   // ---------------------------------------------------------------- Detalle
@@ -260,6 +304,7 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
       const orden = await api.enviar('/api/ordenes', 'POST', leerFormulario());
       formulario.reset();
       dom.aviso(aviso, `Orden #${orden.id} creada para ${orden.vehiculo.placa}. Quedó en estado ${orden.estadoNombre}.`, 'ok');
+      pagina = 1;
       await cargar();
     } catch (error) {
       const sinCampo = dom.marcarErrores(formulario, error.detalles || []);
@@ -277,8 +322,11 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
       panelNueva.hidden = !puedeCrear();
       $('#disposicion-ordenes').classList.toggle('disposicion--sola', !puedeCrear());
       campoMecanico.hidden = !eligeMecanico();
-      $('#titulo-lista-ordenes').textContent = usuario.rol === 'mecanico' ? 'Mis órdenes' : 'Órdenes';
-      if (eligeMecanico()) await cargarMecanicos().catch(() => {});
+      const esMecanico = usuario.rol === 'mecanico';
+      $('#campo-filtro-mecanico').hidden = esMecanico;
+      $('#titulo-lista-ordenes').textContent = esMecanico ? 'Mis órdenes' : 'Todas las órdenes';
+      if (!esMecanico) await cargarMecanicos().catch(() => {});
+      pagina = 1;
       await cargar();
     },
   };

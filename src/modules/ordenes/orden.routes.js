@@ -18,7 +18,7 @@ function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar }) {
   const router = express.Router();
 
   router.get('/', (req, res) => {
-    res.json(servicio.listar(req.usuario));
+    res.json(servicio.listar(req.query, req.usuario));
   });
 
   router.post('/', puedenCrear, (req, res) => {
