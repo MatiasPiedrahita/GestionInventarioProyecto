@@ -9,6 +9,9 @@ const { crearServicioAuth } = require('./modules/auth/auth.service');
 const { crearAutenticacion, autorizar } = require('./modules/auth/auth.middleware');
 const { crearRutasAuth } = require('./modules/auth/auth.routes');
 const { ROLES } = require('./modules/auth/roles');
+const { crearRepositorioOrdenes } = require('./modules/ordenes/orden.repository');
+const { crearServicioOrdenes } = require('./modules/ordenes/orden.service');
+const { crearRutasOrdenes } = require('./modules/ordenes/orden.routes');
 const { manejadorDeErrores } = require('./shared/errorHandler');
 
 /**
@@ -24,11 +27,14 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   app.use(express.json({ limit: '100kb' }));
 
   // --- Composición de módulos (capas) ---------------------------------------
-  const servicioAuth = crearServicioAuth(crearRepositorioUsuarios(db), { ahora });
+  const repositorioUsuarios = crearRepositorioUsuarios(db);
+  const servicioAuth = crearServicioAuth(repositorioUsuarios, { ahora });
   const servicioInventario = crearServicioInventario(crearRepositorioRepuestos(db));
+  const servicioOrdenes = crearServicioOrdenes(crearRepositorioOrdenes(db), repositorioUsuarios);
 
   const autenticar = crearAutenticacion(servicioAuth);
   const gestionInventario = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
+  const puedenCrearOrdenes = autorizar(ROLES.MECANICO, ROLES.DUENO, ROLES.ADMINISTRADOR);
 
   // --- Rutas públicas ---------------------------------------------------------
   app.get('/api/salud', (req, res) => res.json({ estado: 'ok' }));
@@ -37,6 +43,8 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   // --- Rutas protegidas: todo lo demás exige sesión ----------------------------
   app.use('/api', autenticar);
   app.use('/api/repuestos', crearRutasInventario(servicioInventario, { soloGestion: gestionInventario }));
+  app.get('/api/usuarios/mecanicos', (req, res) => res.json(servicioAuth.listarMecanicos()));
+  app.use('/api/ordenes', crearRutasOrdenes(servicioOrdenes, { puedenCrear: puedenCrearOrdenes }));
 
   app.use('/api', (req, res) => {
     res.status(404).json({ error: 'RUTA_NO_ENCONTRADA', mensaje: `No existe ${req.method} ${req.originalUrl}`, detalles: [] });
@@ -45,7 +53,7 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use(manejadorDeErrores);
 
-  return { app, servicios: { auth: servicioAuth, inventario: servicioInventario } };
+  return { app, servicios: { auth: servicioAuth, inventario: servicioInventario, ordenes: servicioOrdenes } };
 }
 
 module.exports = { crearApp };
