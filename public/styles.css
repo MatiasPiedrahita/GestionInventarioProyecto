@@ -279,3 +279,63 @@ dialog::backdrop { background: rgb(28 39 48 / 45%); }
   padding: 0.1rem 0.55rem;
   margin-left: 0.25rem;
 }
+
+/* ===================== Órdenes de trabajo (HU-03) ===================== */
+.disposicion--sola { grid-template-columns: 1fr; }
+
+fieldset { border: 0; padding: 0; margin: 0 0 0.75rem; min-width: 0; }
+legend {
+  font: 600 1.05rem var(--fuente-condensada);
+  color: var(--overol);
+  padding: 0;
+  margin-bottom: 0.5rem;
+}
+.opcional { font-weight: 400; color: var(--tinta-suave); font-size: 0.8rem; }
+
+textarea, select {
+  font: inherit;
+  color: inherit;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-control);
+  background: #fff;
+  width: 100%;
+}
+textarea { resize: vertical; min-height: 4.5rem; }
+textarea[aria-invalid='true'], select[aria-invalid='true'] { border-color: var(--oxido); background: var(--oxido-claro); }
+.placa-input { font-family: var(--fuente-condensada); font-size: 1.1rem; letter-spacing: 0.06em; }
+
+.tabla-ordenes { min-width: 760px; }
+.num-orden { font-variant-numeric: tabular-nums; color: var(--tinta-suave); white-space: nowrap; }
+.col-problema { max-width: 18rem; }
+.recortado {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* La placa se dibuja como una placa colombiana: fondo amarillo, borde negro */
+.placa {
+  display: inline-block;
+  font: 700 1rem var(--fuente-condensada);
+  letter-spacing: 0.08em;
+  background: #f5c400;
+  color: #111;
+  border: 2px solid #111;
+  border-radius: 4px;
+  padding: 0 0.4rem;
+  line-height: 1.5;
+}
+
+.estado {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.estado--en_proceso { background: #dde6f1; color: var(--overol-oscuro); }
+.estado--finalizada { background: #dcebe1; color: var(--ok); }
+.estado--cancelada { background: #ebe7e4; color: var(--tinta-suave); }

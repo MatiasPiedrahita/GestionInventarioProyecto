@@ -43,10 +43,110 @@
     <section class="vista" data-vista="ordenes" hidden>
       <header class="cabecera">
         <div>
-          <h1>Órdenes de trabajo</h1>
-          <p class="resumen">Las órdenes de trabajo llegan en la siguiente historia del sprint.</p>
+          <h1 id="titulo-ordenes">Órdenes de trabajo</h1>
+          <p class="resumen" id="resumen-ordenes" aria-live="polite"></p>
         </div>
       </header>
+
+      <div class="disposicion" id="disposicion-ordenes">
+        <section class="panel panel--formulario" id="panel-nueva-orden" aria-labelledby="titulo-nueva-orden">
+          <h2 id="titulo-nueva-orden">Nueva orden</h2>
+          <form id="formulario-orden" novalidate>
+            <fieldset>
+              <legend>Cliente</legend>
+              <div class="fila-campos">
+                <div class="campo">
+                  <label for="orden-documento">Documento</label>
+                  <input id="orden-documento" name="cliente.documento" inputmode="numeric" autocomplete="off" required>
+                  <p class="campo__error" data-error="cliente.documento"></p>
+                </div>
+                <div class="campo">
+                  <label for="orden-telefono">Teléfono</label>
+                  <input id="orden-telefono" name="cliente.telefono" type="tel" required>
+                  <p class="campo__error" data-error="cliente.telefono"></p>
+                </div>
+              </div>
+              <div class="campo">
+                <label for="orden-cliente">Nombre</label>
+                <input id="orden-cliente" name="cliente.nombre" required>
+                <p class="campo__error" data-error="cliente.nombre"></p>
+              </div>
+              <div class="campo">
+                <label for="orden-email">Correo <span class="opcional">(opcional)</span></label>
+                <input id="orden-email" name="cliente.email" type="email">
+                <p class="campo__error" data-error="cliente.email"></p>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Vehículo</legend>
+              <div class="fila-campos">
+                <div class="campo">
+                  <label for="orden-placa">Placa</label>
+                  <input id="orden-placa" name="vehiculo.placa" class="placa-input" placeholder="ABC123" autocomplete="off" required>
+                  <p class="campo__error" data-error="vehiculo.placa"></p>
+                </div>
+                <div class="campo">
+                  <label for="orden-anio">Año <span class="opcional">(opcional)</span></label>
+                  <input id="orden-anio" name="vehiculo.anio" type="number" min="1950" step="1" inputmode="numeric">
+                  <p class="campo__error" data-error="vehiculo.anio"></p>
+                </div>
+              </div>
+              <div class="fila-campos">
+                <div class="campo">
+                  <label for="orden-marca">Marca</label>
+                  <input id="orden-marca" name="vehiculo.marca" placeholder="Chevrolet" required>
+                  <p class="campo__error" data-error="vehiculo.marca"></p>
+                </div>
+                <div class="campo">
+                  <label for="orden-modelo">Modelo</label>
+                  <input id="orden-modelo" name="vehiculo.modelo" placeholder="Spark GT" required>
+                  <p class="campo__error" data-error="vehiculo.modelo"></p>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Trabajo</legend>
+              <div class="campo">
+                <label for="orden-descripcion">Descripción del problema</label>
+                <textarea id="orden-descripcion" name="descripcion" rows="3" maxlength="1000" required></textarea>
+                <p class="campo__error" data-error="descripcion"></p>
+              </div>
+              <div class="campo" id="campo-mecanico" hidden>
+                <label for="orden-mecanico">Mecánico asignado</label>
+                <select id="orden-mecanico" name="mecanicoId"></select>
+                <p class="campo__error" data-error="mecanicoId"></p>
+              </div>
+            </fieldset>
+
+            <p class="aviso" id="aviso-orden" role="status"></p>
+            <button type="submit" class="boton">Crear orden</button>
+          </form>
+        </section>
+
+        <section class="panel panel--tabla" aria-labelledby="titulo-lista-ordenes">
+          <div class="barra">
+            <h2 id="titulo-lista-ordenes">Órdenes</h2>
+          </div>
+          <p class="aviso" id="aviso-lista-ordenes" role="status"></p>
+          <div class="tabla-contenedor">
+            <table class="tabla-ordenes">
+              <thead>
+                <tr>
+                  <th scope="col">N.º</th>
+                  <th scope="col">Vehículo</th>
+                  <th scope="col">Cliente</th>
+                  <th scope="col" class="col-problema">Problema</th>
+                  <th scope="col">Mecánico</th>
+                  <th scope="col">Estado</th>
+                </tr>
+              </thead>
+              <tbody id="cuerpo-ordenes"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </section>
 
     <!-- Vista: inventario (dueño y administrador) -->
@@ -152,6 +252,7 @@
   <script src="js/api.js"></script>
   <script src="js/comun.js"></script>
   <script src="js/vistas/inventario.js"></script>
+  <script src="js/vistas/ordenes.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
