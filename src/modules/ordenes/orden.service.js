@@ -1,5 +1,6 @@
 const { validarNuevaOrden } = require('./orden.validator');
 const { validarRepuestosUsados } = require('./repuestos-usados.validator');
+const { validarFiltros } = require('./filtros.validator');
 const { ESTADOS } = require('./estados');
 const { ROLES } = require('../auth/roles');
 const { ErrorDeValidacion, NoEncontrado, SinPermiso, Conflicto } = require('../../shared/errors');
@@ -141,8 +142,24 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos) {
       return this.obtener(id, usuario);
     },
 
-    listar(usuario) {
-      return repositorio.listar({ mecanicoId: usuario.rol === ROLES.MECANICO ? usuario.id : null });
+    /**
+     * HU-06: listado global con filtros (placa exacta, cliente, mecánico,
+     * estado) y paginación. El mecánico solo ve sus órdenes, aunque pida otras.
+     */
+    listar(query, usuario) {
+      const resultado = validarFiltros(query);
+      if (!resultado.valido) throw new ErrorDeValidacion(resultado.errores, 'Los filtros del listado no son válidos');
+      const filtros = { ...resultado.valor };
+      if (usuario.rol === ROLES.MECANICO) filtros.mecanicoId = usuario.id;
+
+      const { datos, total } = repositorio.buscar(filtros);
+      return {
+        datos,
+        pagina: filtros.pagina,
+        tamano: filtros.tamano,
+        total,
+        totalPaginas: Math.max(1, Math.ceil(total / filtros.tamano)),
+      };
     },
   };
 }
