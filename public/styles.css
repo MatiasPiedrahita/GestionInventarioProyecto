@@ -57,7 +57,7 @@ h2 { font-size: 1.5rem; }
 /* Disposición */
 .disposicion {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) 1fr;
+  grid-template-columns: minmax(260px, 290px) 1fr;
   gap: 1.25rem;
   max-width: 1280px;
   margin: 0 auto;
@@ -136,7 +136,7 @@ label.boton:focus-within { outline: 3px solid var(--overol); outline-offset: 2px
 /* Tabla */
 .tabla-contenedor { overflow-x: auto; position: relative; }
 table { width: 100%; border-collapse: collapse; min-width: 760px; }
-.col-nombre { min-width: 15rem; }
+.col-nombre { min-width: 12.5rem; }
 .col-acciones { width: 1%; }
 th {
   text-align: left;
@@ -154,7 +154,7 @@ tr.bajo .sku { color: var(--oxido); }
 
 .vacio { text-align: center; color: var(--tinta-suave); padding: 2.5rem 1rem; }
 
-.acciones-fila { display: flex; gap: 0.25rem; justify-content: flex-end; white-space: nowrap; }
+.acciones-fila { display: flex; gap: 0.1rem; justify-content: flex-end; white-space: nowrap; }
 .acciones-fila button {
   font: 500 0.875rem var(--fuente);
   background: none;
@@ -168,7 +168,7 @@ tr.bajo .sku { color: var(--oxido); }
 .acciones-fila button.peligro { color: var(--oxido); }
 
 /* Varilla de nivel: el stock se lee como una varilla de aceite con su marca MIN */
-.varilla { min-width: 170px; }
+.varilla { min-width: 150px; }
 .varilla__pista {
   position: relative;
   height: 10px;
@@ -221,4 +221,61 @@ dialog::backdrop { background: rgb(28 39 48 / 45%); }
 
 @media (prefers-reduced-motion: reduce) {
   .varilla__nivel { transition: none; }
+}
+
+/* ===================== Sesión y navegación (HU-02) ===================== */
+[hidden] { display: none !important; }
+
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+.login__tarjeta {
+  width: min(380px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--linea);
+  border-top: 6px solid var(--overol);
+  border-radius: var(--radio-panel);
+  padding: 1.75rem;
+}
+.login__marca {
+  margin: 0 0 0.25rem;
+  font: 600 0.95rem var(--fuente-condensada);
+  color: var(--overol);
+}
+.login__tarjeta h1 { margin-bottom: 1.25rem; }
+.boton--ancho { width: 100%; margin-top: 0.5rem; }
+
+.barra-app {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+  flex-wrap: wrap;
+  background: var(--tinta);
+  color: #fff;
+  padding: 0.5rem 1.5rem;
+}
+.barra-app__marca { margin: 0; font: 700 1.2rem var(--fuente-condensada); }
+.barra-app__menu { display: flex; gap: 0.25rem; margin-right: auto; flex-wrap: wrap; }
+.barra-app__menu a {
+  color: #c9d6e3;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 3px solid transparent;
+}
+.barra-app__menu a:hover { color: #fff; }
+.barra-app__menu a[aria-current='page'] { color: #fff; border-bottom-color: #7fa8d9; }
+.barra-app__usuario { display: flex; align-items: center; gap: 0.75rem; font-size: 0.95rem; }
+.barra-app__usuario .boton--texto { color: #c9d6e3; }
+.barra-app__usuario .boton--texto:hover { color: #fff; }
+.etiqueta-rol {
+  font-size: 0.8rem;
+  color: #c9d6e3;
+  border: 1px solid #4a5b69;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  margin-left: 0.25rem;
 }

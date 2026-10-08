@@ -1,4 +1,4 @@
--- Esquema de la base de datos del módulo de inventario.
+-- Migración 001 · Inventario de repuestos (HU Gestión de inventario).
 -- Las restricciones CHECK son una segunda línea de defensa: la validación
 -- principal ocurre en la capa de lógica (repuesto.validator.js).
 

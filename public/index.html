@@ -3,102 +3,145 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Inventario de repuestos · Taller</title>
+  <title>Gestión del taller</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="cabecera">
-    <div>
-      <h1>Inventario de repuestos</h1>
-      <p class="resumen" id="resumen" aria-live="polite">Cargando inventario…</p>
-    </div>
-    <label class="boton boton--secundario" for="archivo-csv">
-      Importar CSV
-      <input type="file" id="archivo-csv" accept=".csv,text/csv" hidden>
-    </label>
-  </header>
-
-  <main class="disposicion">
-    <section class="panel panel--formulario" aria-labelledby="titulo-formulario">
-      <h2 id="titulo-formulario">Registrar repuesto</h2>
-      <form id="formulario" novalidate>
-        <input type="hidden" name="id">
-        <div class="campo">
-          <label for="sku">SKU</label>
-          <input id="sku" name="sku" autocomplete="off" placeholder="FIL-ACE-001" required>
-          <p class="campo__error" data-error="sku"></p>
-        </div>
-        <div class="campo">
-          <label for="nombre">Nombre</label>
-          <input id="nombre" name="nombre" placeholder="Filtro de aceite Mann W712" required>
-          <p class="campo__error" data-error="nombre"></p>
-        </div>
-        <div class="fila-campos">
-          <div class="campo">
-            <label for="costo">Costo (COP)</label>
-            <input id="costo" name="costo" type="number" min="0" step="100" inputmode="numeric" required>
-            <p class="campo__error" data-error="costo"></p>
-          </div>
-          <div class="campo">
-            <label for="ubicacion">Ubicación</label>
-            <input id="ubicacion" name="ubicacion" placeholder="Estante A1">
-            <p class="campo__error" data-error="ubicacion"></p>
-          </div>
-        </div>
-        <div class="fila-campos">
-          <div class="campo">
-            <label for="stockActual">Unidades en stock</label>
-            <input id="stockActual" name="stockActual" type="number" min="0" step="1" inputmode="numeric" required>
-            <p class="campo__error" data-error="stockActual"></p>
-          </div>
-          <div class="campo">
-            <label for="stockMinimo">Stock mínimo</label>
-            <input id="stockMinimo" name="stockMinimo" type="number" min="0" step="1" inputmode="numeric" value="0">
-            <p class="campo__error" data-error="stockMinimo"></p>
-          </div>
-        </div>
-        <div class="campo">
-          <label for="proveedor">Proveedor</label>
-          <input id="proveedor" name="proveedor" placeholder="Autopartes del Valle">
-          <p class="campo__error" data-error="proveedor"></p>
-        </div>
-        <p class="aviso" id="aviso-formulario" role="status"></p>
-        <div class="acciones">
-          <button type="submit" class="boton" id="boton-guardar">Guardar repuesto</button>
-          <button type="button" class="boton boton--texto" id="boton-cancelar" hidden>Cancelar edición</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="panel panel--tabla" aria-labelledby="titulo-tabla">
-      <div class="barra">
-        <h2 id="titulo-tabla">Catálogo</h2>
-        <input type="search" id="busqueda" placeholder="Buscar SKU, nombre o proveedor" aria-label="Buscar repuesto">
-        <label class="interruptor">
-          <input type="checkbox" id="solo-bajo-stock">
-          Solo los que están por agotarse
-        </label>
+  <!-- Pantalla de login -->
+  <main id="pantalla-login" class="login" hidden>
+    <form id="formulario-login" class="login__tarjeta" novalidate>
+      <p class="login__marca">Gestión del taller</p>
+      <h1>Ingresar</h1>
+      <div class="campo">
+        <label for="login-usuario">Usuario</label>
+        <input id="login-usuario" name="usuario" autocomplete="username" autocapitalize="none" required>
       </div>
-      <p class="aviso" id="aviso-tabla" role="status"></p>
-      <div class="tabla-contenedor">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">SKU</th>
-              <th scope="col" class="col-nombre">Repuesto</th>
-              <th scope="col" class="num">Costo</th>
-              <th scope="col">Nivel de stock</th>
-              <th scope="col" class="col-acciones"><span class="sr-only">Acciones</span></th>
-            </tr>
-          </thead>
-          <tbody id="cuerpo-tabla"></tbody>
-        </table>
+      <div class="campo">
+        <label for="login-password">Contraseña</label>
+        <input id="login-password" name="password" type="password" autocomplete="current-password" required>
       </div>
-    </section>
+      <p class="aviso" id="aviso-login" role="alert"></p>
+      <button type="submit" class="boton boton--ancho">Ingresar</button>
+    </form>
   </main>
+
+  <!-- Aplicación (después del login) -->
+  <div id="pantalla-app" hidden>
+    <header class="barra-app">
+      <p class="barra-app__marca">Gestión del taller</p>
+      <nav id="menu" class="barra-app__menu" aria-label="Secciones"></nav>
+      <div class="barra-app__usuario">
+        <span><strong id="nombre-usuario"></strong> <span id="rol-usuario" class="etiqueta-rol"></span></span>
+        <button type="button" class="boton boton--texto" id="boton-salir">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <!-- Vista: órdenes de trabajo -->
+    <section class="vista" data-vista="ordenes" hidden>
+      <header class="cabecera">
+        <div>
+          <h1>Órdenes de trabajo</h1>
+          <p class="resumen">Las órdenes de trabajo llegan en la siguiente historia del sprint.</p>
+        </div>
+      </header>
+    </section>
+
+    <!-- Vista: inventario (dueño y administrador) -->
+    <section class="vista" data-vista="inventario" hidden>
+      <header class="cabecera">
+        <div>
+          <h1>Inventario de repuestos</h1>
+          <p class="resumen" id="resumen" aria-live="polite">Cargando inventario…</p>
+        </div>
+        <label class="boton boton--secundario" for="archivo-csv">
+          Importar CSV
+          <input type="file" id="archivo-csv" accept=".csv,text/csv" hidden>
+        </label>
+      </header>
+
+      <div class="disposicion">
+        <section class="panel panel--formulario" aria-labelledby="titulo-formulario">
+          <h2 id="titulo-formulario">Registrar repuesto</h2>
+          <form id="formulario" novalidate>
+            <input type="hidden" name="id">
+            <div class="campo">
+              <label for="sku">SKU</label>
+              <input id="sku" name="sku" autocomplete="off" placeholder="FIL-ACE-001" required>
+              <p class="campo__error" data-error="sku"></p>
+            </div>
+            <div class="campo">
+              <label for="nombre">Nombre</label>
+              <input id="nombre" name="nombre" placeholder="Filtro de aceite Mann W712" required>
+              <p class="campo__error" data-error="nombre"></p>
+            </div>
+            <div class="fila-campos">
+              <div class="campo">
+                <label for="costo">Costo (COP)</label>
+                <input id="costo" name="costo" type="number" min="0" step="100" inputmode="numeric" required>
+                <p class="campo__error" data-error="costo"></p>
+              </div>
+              <div class="campo">
+                <label for="ubicacion">Ubicación</label>
+                <input id="ubicacion" name="ubicacion" placeholder="Estante A1">
+                <p class="campo__error" data-error="ubicacion"></p>
+              </div>
+            </div>
+            <div class="fila-campos">
+              <div class="campo">
+                <label for="stockActual">Unidades en stock</label>
+                <input id="stockActual" name="stockActual" type="number" min="0" step="1" inputmode="numeric" required>
+                <p class="campo__error" data-error="stockActual"></p>
+              </div>
+              <div class="campo">
+                <label for="stockMinimo">Stock mínimo</label>
+                <input id="stockMinimo" name="stockMinimo" type="number" min="0" step="1" inputmode="numeric" value="0">
+                <p class="campo__error" data-error="stockMinimo"></p>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="proveedor">Proveedor</label>
+              <input id="proveedor" name="proveedor" placeholder="Autopartes del Valle">
+              <p class="campo__error" data-error="proveedor"></p>
+            </div>
+            <p class="aviso" id="aviso-formulario" role="status"></p>
+            <div class="acciones">
+              <button type="submit" class="boton" id="boton-guardar">Guardar repuesto</button>
+              <button type="button" class="boton boton--texto" id="boton-cancelar" hidden>Cancelar edición</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel panel--tabla" aria-labelledby="titulo-tabla">
+          <div class="barra">
+            <h2 id="titulo-tabla">Catálogo</h2>
+            <input type="search" id="busqueda" placeholder="Buscar SKU, nombre o proveedor" aria-label="Buscar repuesto">
+            <label class="interruptor">
+              <input type="checkbox" id="solo-bajo-stock">
+              Solo los que están por agotarse
+            </label>
+          </div>
+          <p class="aviso" id="aviso-tabla" role="status"></p>
+          <div class="tabla-contenedor">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">SKU</th>
+                  <th scope="col" class="col-nombre">Repuesto</th>
+                  <th scope="col" class="num">Costo</th>
+                  <th scope="col">Nivel de stock</th>
+                  <th scope="col" class="col-acciones"><span class="sr-only">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody id="cuerpo-tabla"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
 
   <dialog id="dialogo-historial" aria-labelledby="titulo-historial">
     <h2 id="titulo-historial">Historial</h2>
@@ -106,6 +149,9 @@
     <form method="dialog"><button class="boton boton--secundario">Cerrar</button></form>
   </dialog>
 
-  <script src="app.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/comun.js"></script>
+  <script src="js/vistas/inventario.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
