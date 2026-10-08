@@ -166,7 +166,37 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
     $('#total-repuestos-orden').textContent = formato.pesos.format(orden.totalRepuestos);
 
     formularioUsado.hidden = !(puedeCrear() && orden.estado === 'EN_PROCESO');
+    pintarNotas(orden);
   }
+
+  // ------------------------------------------------------------------ Notas
+  const formularioNotas = $('#formulario-notas');
+  const campoNotas = $('#notas-orden');
+  const avisoNotas = $('#aviso-notas');
+
+  function pintarNotas(orden) {
+    const editable = puedeCrear();
+    campoNotas.value = orden.notas || '';
+    campoNotas.readOnly = !editable;
+    campoNotas.placeholder = editable ? campoNotas.placeholder : 'Sin notas registradas.';
+    $('#boton-guardar-notas').hidden = !editable;
+    $('#meta-notas').textContent = orden.notasActualizadasEn
+      ? `Última actualización: ${formato.fechaSqlite(orden.notasActualizadasEn)}, por ${orden.notasActualizadasPor}`
+      : 'Todavía no hay notas.';
+  }
+
+  formularioNotas.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    avisoNotas.textContent = '';
+    try {
+      const orden = await api.enviar(`/api/ordenes/${ordenAbierta.id}/notas`, 'PATCH', { notas: campoNotas.value });
+      ordenAbierta = orden;
+      pintarNotas(orden);
+      dom.aviso(avisoNotas, orden.notas ? 'Notas guardadas.' : 'Notas borradas.', 'ok');
+    } catch (error) {
+      dom.aviso(avisoNotas, error.message, 'error');
+    }
+  });
 
   async function cargarRepuestosDisponibles() {
     const select = $('#usado-repuesto');
@@ -185,6 +215,7 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
 
   async function abrirDetalle(id) {
     avisoUsado.textContent = '';
+    avisoNotas.textContent = '';
     try {
       const orden = await api.pedir(`/api/ordenes/${id}`);
       pintarDetalle(orden);
