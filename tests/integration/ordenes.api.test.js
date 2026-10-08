@@ -72,8 +72,8 @@ describe('API /api/ordenes (integración)', () => {
     const propias = await ctx.como('mecanico').get('/api/ordenes');
     const todas = await ctx.como('dueno').get('/api/ordenes');
 
-    expect(propias.body.map((o) => o.vehiculo.placa)).toEqual(['ABC123']);
-    expect(todas.body).toHaveLength(2);
+    expect(propias.body.datos.map((o) => o.vehiculo.placa)).toEqual(['ABC123']);
+    expect(todas.body.total).toBe(2);
   });
 
   test('detalle: 403 si la orden es de otro mecánico, 404 si no existe', async () => {
