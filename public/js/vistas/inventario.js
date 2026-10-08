@@ -1,8 +1,11 @@
-/* global document, fetch, FileReader, window */
-(function iniciar() {
+/* global document, FileReader, window */
+/**
+ * Vista "Inventario" (HU-01): solo para dueño y administrador.
+ * Se registra en window.Taller.vistas y el enrutador llama alMostrar().
+ */
+window.Taller.vistas.inventario = (function crearVistaInventario() {
   const API = '/api/repuestos';
-  const pesos = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-  const fechas = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+  const { pesos, fechas } = window.Taller.formato;
 
   const $ = (selector) => document.querySelector(selector);
   const formulario = $('#formulario');
@@ -26,17 +29,7 @@
 
   let repuestosVisibles = [];
 
-  async function pedir(url, opciones = {}) {
-    const respuesta = await fetch(url, opciones);
-    if (respuesta.status === 204) return null;
-    const cuerpo = await respuesta.json().catch(() => ({}));
-    if (!respuesta.ok) {
-      const error = new Error(cuerpo.mensaje || `Error ${respuesta.status}`);
-      error.detalles = cuerpo.detalles || [];
-      throw error;
-    }
-    return cuerpo;
-  }
+  const { pedir } = window.Taller.api;
 
   function crear(etiqueta, { clase, texto } = {}) {
     const el = document.createElement(etiqueta);
@@ -308,5 +301,5 @@
     lector.readAsText(archivo, 'utf-8');
   });
 
-  cargar();
+  return { alMostrar: cargar };
 }());
