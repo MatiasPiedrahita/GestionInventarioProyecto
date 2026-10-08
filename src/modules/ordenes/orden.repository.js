@@ -3,6 +3,7 @@ const { NOMBRE_ESTADO } = require('./estados');
 /** Columnas comunes para leer una orden con su cliente, vehículo y mecánico. */
 const SELECT_ORDEN = `
   SELECT o.id, o.descripcion, o.estado, o.creado_en, o.actualizado_en,
+         o.notas, o.notas_actualizadas_en, n.nombre AS notas_autor,
          o.mecanico_id, m.nombre AS mecanico_nombre,
          c.id AS cliente_id, c.documento, c.nombre AS cliente_nombre, c.telefono, c.email,
          v.id AS vehiculo_id, v.placa, v.marca, v.modelo, v.anio
@@ -10,6 +11,7 @@ const SELECT_ORDEN = `
     JOIN clientes  c ON c.id = o.cliente_id
     JOIN vehiculos v ON v.id = o.vehiculo_id
     JOIN usuarios  m ON m.id = o.mecanico_id
+    LEFT JOIN usuarios n ON n.id = o.notas_actualizadas_por
 `;
 
 function aDominio(fila) {
@@ -21,6 +23,9 @@ function aDominio(fila) {
     descripcion: fila.descripcion,
     creadoEn: fila.creado_en,
     actualizadoEn: fila.actualizado_en,
+    notas: fila.notas,
+    notasActualizadasEn: fila.notas_actualizadas_en,
+    notasActualizadasPor: fila.notas_autor,
     mecanico: { id: fila.mecanico_id, nombre: fila.mecanico_nombre },
     cliente: {
       id: fila.cliente_id,
@@ -80,6 +85,12 @@ function crearRepositorioOrdenes(db) {
        ORDER BY d.id
     `),
     tocarOrden: db.prepare("UPDATE ordenes SET actualizado_en = datetime('now') WHERE id = ?"),
+    actualizarNotas: db.prepare(`
+      UPDATE ordenes
+         SET notas = @notas, notas_actualizadas_en = datetime('now'), notas_actualizadas_por = @usuarioId,
+             actualizado_en = datetime('now')
+       WHERE id = @id
+    `),
   };
 
   return {
@@ -125,6 +136,9 @@ function crearRepositorioOrdenes(db) {
     insertarDetalle(datos) {
       sentencias.insertarDetalle.run(datos);
       sentencias.tocarOrden.run(datos.ordenId);
+    },
+    actualizarNotas(id, notas, usuarioId) {
+      sentencias.actualizarNotas.run({ id, notas, usuarioId });
     },
     listarRepuestosDeOrden(ordenId) {
       return sentencias.repuestosDeOrden.all(ordenId).map((fila) => ({

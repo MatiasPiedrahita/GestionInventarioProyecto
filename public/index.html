@@ -254,6 +254,20 @@
     <dl class="ficha" id="ficha-orden"></dl>
     <p class="problema" id="problema-orden"></p>
 
+    <section class="bloque-orden" aria-labelledby="titulo-notas-orden">
+      <h3 id="titulo-notas-orden">Notas de la reparación</h3>
+      <form id="formulario-notas" novalidate>
+        <label for="notas-orden" class="sr-only">Notas de la reparación</label>
+        <textarea id="notas-orden" name="notas" rows="4" maxlength="4000"
+          placeholder="Observaciones del servicio: qué se encontró, qué se hizo, recomendaciones para el cliente…"></textarea>
+        <div class="notas-pie">
+          <p class="detalle" id="meta-notas"></p>
+          <button type="submit" class="boton boton--secundario" id="boton-guardar-notas">Guardar notas</button>
+        </div>
+      </form>
+      <p class="aviso" id="aviso-notas" role="status"></p>
+    </section>
+
     <section class="bloque-orden" aria-labelledby="titulo-repuestos-orden">
       <h3 id="titulo-repuestos-orden">Repuestos usados</h3>
       <div class="tabla-contenedor">

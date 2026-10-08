@@ -395,3 +395,15 @@ textarea[aria-invalid='true'], select[aria-invalid='true'] { border-color: var(-
 .agregar-repuesto .campo { margin-bottom: 0; }
 .campo--crece { flex: 1 1 260px; }
 .campo--cantidad { flex: 0 0 110px; }
+
+/* ===================== Notas de la reparación (HU-05) ===================== */
+#notas-orden[readonly] { background: var(--fondo); }
+.notas-pie {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+.notas-pie .detalle { margin: 0; }
