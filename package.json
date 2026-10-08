@@ -1,7 +1,7 @@
 {
   "name": "taller-inventario",
   "version": "0.1.0",
-  "description": "Sistema de gestión de inventario con predicción de demanda de repuestos para talleres mecánicos (MVP - HU-01 Gestión de inventario)",
+  "description": "Sistema de gestión de inventario con predicción de demanda de repuestos para talleres mecánicos",
   "private": true,
   "main": "src/server.js",
   "engines": {
@@ -13,7 +13,8 @@
     "build": "node --disable-warning=ExperimentalWarning scripts/build.js",
     "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/seed.js",
     "test": "node --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",
-    "test:cobertura": "node --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --coverage"
+    "test:cobertura": "node --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --coverage",
+    "usuario:crear": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/crear-usuario.js"
   },
   "jest": {
     "testEnvironment": "node",

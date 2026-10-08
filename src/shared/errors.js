@@ -18,6 +18,18 @@ class ErrorDeValidacion extends ErrorDeDominio {
   }
 }
 
+class NoAutenticado extends ErrorDeDominio {
+  constructor(mensaje = 'Debes iniciar sesión') {
+    super(mensaje, { status: 401, codigo: 'NO_AUTENTICADO' });
+  }
+}
+
+class SinPermiso extends ErrorDeDominio {
+  constructor(mensaje = 'Tu rol no tiene permiso para esta acción') {
+    super(mensaje, { status: 403, codigo: 'SIN_PERMISO' });
+  }
+}
+
 class NoEncontrado extends ErrorDeDominio {
   constructor(mensaje) {
     super(mensaje, { status: 404, codigo: 'NO_ENCONTRADO' });
@@ -30,4 +42,4 @@ class Conflicto extends ErrorDeDominio {
   }
 }
 
-module.exports = { ErrorDeDominio, ErrorDeValidacion, NoEncontrado, Conflicto };
+module.exports = { ErrorDeDominio, ErrorDeValidacion, NoAutenticado, SinPermiso, NoEncontrado, Conflicto };
