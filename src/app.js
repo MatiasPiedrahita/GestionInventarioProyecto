@@ -29,12 +29,15 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   // --- Composición de módulos (capas) ---------------------------------------
   const repositorioUsuarios = crearRepositorioUsuarios(db);
   const servicioAuth = crearServicioAuth(repositorioUsuarios, { ahora });
-  const servicioInventario = crearServicioInventario(crearRepositorioRepuestos(db));
-  const servicioOrdenes = crearServicioOrdenes(crearRepositorioOrdenes(db), repositorioUsuarios);
+  const repositorioRepuestos = crearRepositorioRepuestos(db);
+  const servicioInventario = crearServicioInventario(repositorioRepuestos);
+  const servicioOrdenes = crearServicioOrdenes(crearRepositorioOrdenes(db), repositorioUsuarios, repositorioRepuestos);
 
   const autenticar = crearAutenticacion(servicioAuth);
   const gestionInventario = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
-  const puedenCrearOrdenes = autorizar(ROLES.MECANICO, ROLES.DUENO, ROLES.ADMINISTRADOR);
+  // Crear órdenes y trabajar en ellas (repuestos, notas): mecánico, dueño y administrador.
+  // La recepcionista solo consulta. El mecánico además solo toca SUS órdenes (lo valida el servicio).
+  const trabajanEnOrdenes = autorizar(ROLES.MECANICO, ROLES.DUENO, ROLES.ADMINISTRADOR);
 
   // --- Rutas públicas ---------------------------------------------------------
   app.get('/api/salud', (req, res) => res.json({ estado: 'ok' }));
@@ -44,7 +47,7 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   app.use('/api', autenticar);
   app.use('/api/repuestos', crearRutasInventario(servicioInventario, { soloGestion: gestionInventario }));
   app.get('/api/usuarios/mecanicos', (req, res) => res.json(servicioAuth.listarMecanicos()));
-  app.use('/api/ordenes', crearRutasOrdenes(servicioOrdenes, { puedenCrear: puedenCrearOrdenes }));
+  app.use('/api/ordenes', crearRutasOrdenes(servicioOrdenes, { puedenCrear: trabajanEnOrdenes, puedenTrabajar: trabajanEnOrdenes }));
 
   app.use('/api', (req, res) => {
     res.status(404).json({ error: 'RUTA_NO_ENCONTRADA', mensaje: `No existe ${req.method} ${req.originalUrl}`, detalles: [] });

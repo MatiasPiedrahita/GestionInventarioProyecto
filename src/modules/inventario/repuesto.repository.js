@@ -47,11 +47,16 @@ function crearRepositorioRepuestos(db) {
        ORDER BY nombre COLLATE NOCASE
     `),
     insertarMovimiento: db.prepare(`
-      INSERT INTO movimientos_inventario (repuesto_id, tipo, cantidad, stock_resultante, detalle)
-      VALUES (@repuestoId, @tipo, @cantidad, @stockResultante, @detalle)
+      INSERT INTO movimientos_inventario (repuesto_id, tipo, cantidad, stock_resultante, detalle, orden_id)
+      VALUES (@repuestoId, @tipo, @cantidad, @stockResultante, @detalle, @ordenId)
+    `),
+    descontar: db.prepare(`
+      UPDATE repuestos
+         SET stock_actual = stock_actual - @cantidad, actualizado_en = datetime('now')
+       WHERE id = @id AND activo = 1 AND stock_actual >= @cantidad
     `),
     movimientosDe: db.prepare(`
-      SELECT id, tipo, cantidad, stock_resultante AS "stockResultante", detalle, fecha
+      SELECT id, tipo, cantidad, stock_resultante AS "stockResultante", detalle, orden_id AS "ordenId", fecha
         FROM movimientos_inventario
        WHERE repuesto_id = ?
        ORDER BY id DESC
@@ -87,7 +92,15 @@ function crearRepositorioRepuestos(db) {
         .map(aDominio);
     },
     registrarMovimiento(movimiento) {
-      sentencias.insertarMovimiento.run({ detalle: null, ...movimiento });
+      sentencias.insertarMovimiento.run({ detalle: null, ordenId: null, ...movimiento });
+    },
+    /**
+     * Resta unidades solo si alcanza el stock (la condición va en el mismo
+     * UPDATE, así dos registros simultáneos no pueden dejarlo negativo).
+     * @returns {boolean} false si no había stock suficiente.
+     */
+    descontarStock(id, cantidad) {
+      return sentencias.descontar.run({ id, cantidad }).changes > 0;
     },
     listarMovimientos(repuestoId) {
       return sentencias.movimientosDe.all(repuestoId).map((fila) => ({ ...fila }));
