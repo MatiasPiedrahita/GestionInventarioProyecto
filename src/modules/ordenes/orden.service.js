@@ -4,6 +4,8 @@ const { ESTADOS } = require('./estados');
 const { ROLES } = require('../auth/roles');
 const { ErrorDeValidacion, NoEncontrado, SinPermiso, Conflicto } = require('../../shared/errors');
 
+const LIMITE_NOTAS = 4000;
+
 /**
  * Lógica de las órdenes de trabajo.
  * @param {object} repositorio Repositorio de órdenes.
@@ -118,6 +120,24 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos) {
         });
       });
 
+      return this.obtener(id, usuario);
+    },
+
+    /**
+     * HU-05: guarda texto libre con las observaciones del servicio. Se
+     * registra quién y cuándo lo actualizó. Enviar texto vacío borra la nota.
+     */
+    actualizarNotas(id, entrada, usuario) {
+      this.obtener(id, usuario);
+      const notas = entrada ? entrada.notas : undefined;
+      if (typeof notas !== 'string') {
+        throw new ErrorDeValidacion([{ campo: 'notas', mensaje: 'Las notas deben ser texto' }]);
+      }
+      const limpias = notas.trim();
+      if (limpias.length > LIMITE_NOTAS) {
+        throw new ErrorDeValidacion([{ campo: 'notas', mensaje: `Las notas admiten máximo ${LIMITE_NOTAS} caracteres` }]);
+      }
+      repositorio.actualizarNotas(id, limpias === '' ? null : limpias, usuario.id);
       return this.obtener(id, usuario);
     },
 

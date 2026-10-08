@@ -34,6 +34,10 @@ function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar }) {
     res.status(201).json(servicio.registrarRepuestos(leerId(req), req.body, req.usuario));
   });
 
+  router.patch('/:id/notas', puedenTrabajar, (req, res) => {
+    res.json(servicio.actualizarNotas(leerId(req), req.body, req.usuario));
+  });
+
   return router;
 }
 
