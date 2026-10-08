@@ -339,3 +339,59 @@ textarea[aria-invalid='true'], select[aria-invalid='true'] { border-color: var(-
 .estado--en_proceso { background: #dde6f1; color: var(--overol-oscuro); }
 .estado--finalizada { background: #dcebe1; color: var(--ok); }
 .estado--cancelada { background: #ebe7e4; color: var(--tinta-suave); }
+
+/* ===================== Detalle de orden y repuestos usados (HU-04) ===================== */
+.boton--chico { padding: 0.3rem 0.7rem; font-size: 0.875rem; }
+
+.dialogo-orden { width: min(760px, 94vw); padding: 0; }
+.dialogo-orden__cabecera {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--linea);
+  position: sticky;
+  top: 0;
+  background: #fff;
+}
+.dialogo-orden__cabecera form { margin-left: auto; }
+.dialogo-orden > :not(header) { margin-left: 1.5rem; margin-right: 1.5rem; }
+
+.ficha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem 1.5rem;
+  margin-top: 1.25rem;
+}
+.ficha dt { font-size: 0.8rem; color: var(--tinta-suave); }
+.ficha dd { margin: 0.15rem 0 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; }
+
+.problema {
+  background: var(--fondo);
+  border-left: 4px solid var(--overol);
+  padding: 0.75rem 1rem;
+  border-radius: 0 var(--radio-control) var(--radio-control) 0;
+  white-space: pre-wrap;
+}
+
+.bloque-orden { margin-top: 1.25rem; margin-bottom: 1.5rem; }
+.bloque-orden h3 { font: 700 1.2rem var(--fuente-condensada); margin: 0 0 0.5rem; }
+
+.tabla-compacta { min-width: 520px; }
+.tabla-compacta td, .tabla-compacta th { padding: 0.5rem 0.625rem; }
+.tabla-compacta tfoot th, .tabla-compacta tfoot td { border-bottom: 0; font-weight: 600; color: var(--tinta); font-size: 1rem; }
+
+.agregar-repuesto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--panel);
+  border: 1px dashed var(--linea);
+  border-radius: var(--radio-control);
+}
+.agregar-repuesto .campo { margin-bottom: 0; }
+.campo--crece { flex: 1 1 260px; }
+.campo--cantidad { flex: 0 0 110px; }

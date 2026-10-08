@@ -67,6 +67,19 @@ function crearRepositorioOrdenes(db) {
     porId: db.prepare(`${SELECT_ORDEN} WHERE o.id = ?`),
     listarTodas: db.prepare(`${SELECT_ORDEN} ORDER BY o.id DESC LIMIT 200`),
     listarDeMecanico: db.prepare(`${SELECT_ORDEN} WHERE o.mecanico_id = ? ORDER BY o.id DESC LIMIT 200`),
+    insertarDetalle: db.prepare(`
+      INSERT INTO detalle_repuestos (orden_id, repuesto_id, cantidad, costo_unitario, registrado_por)
+      VALUES (@ordenId, @repuestoId, @cantidad, @costoUnitario, @registradoPor)
+    `),
+    repuestosDeOrden: db.prepare(`
+      SELECT d.id, d.repuesto_id, r.sku, r.nombre, d.cantidad, d.costo_unitario, d.creado_en, u.nombre AS registrado_por
+        FROM detalle_repuestos d
+        JOIN repuestos r ON r.id = d.repuesto_id
+        JOIN usuarios  u ON u.id = d.registrado_por
+       WHERE d.orden_id = ?
+       ORDER BY d.id
+    `),
+    tocarOrden: db.prepare("UPDATE ordenes SET actualizado_en = datetime('now') WHERE id = ?"),
   };
 
   return {
@@ -108,6 +121,23 @@ function crearRepositorioOrdenes(db) {
     listar({ mecanicoId = null } = {}) {
       const filas = mecanicoId ? sentencias.listarDeMecanico.all(mecanicoId) : sentencias.listarTodas.all();
       return filas.map(aDominio);
+    },
+    insertarDetalle(datos) {
+      sentencias.insertarDetalle.run(datos);
+      sentencias.tocarOrden.run(datos.ordenId);
+    },
+    listarRepuestosDeOrden(ordenId) {
+      return sentencias.repuestosDeOrden.all(ordenId).map((fila) => ({
+        id: fila.id,
+        repuestoId: fila.repuesto_id,
+        sku: fila.sku,
+        nombre: fila.nombre,
+        cantidad: fila.cantidad,
+        costoUnitario: fila.costo_unitario,
+        subtotal: Math.round(fila.cantidad * fila.costo_unitario * 100) / 100,
+        registradoPor: fila.registrado_por,
+        creadoEn: fila.creado_en,
+      }));
     },
     enTransaccion(fn) {
       db.exec('BEGIN');

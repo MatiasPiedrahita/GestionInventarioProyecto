@@ -25,6 +25,7 @@ window.Taller.vistas.inventario = (function crearVistaInventario() {
     AJUSTE: 'Ajuste de stock',
     BAJA: 'Dado de baja',
     CARGA_CSV: 'Carga por CSV',
+    USO_EN_ORDEN: 'Usado en orden',
   };
 
   let repuestosVisibles = [];
@@ -259,7 +260,8 @@ window.Taller.vistas.inventario = (function crearVistaInventario() {
         lista.replaceChildren();
         movimientos.forEach((m) => {
           const item = crear('li');
-          item.appendChild(crear('span', { texto: ETIQUETAS_MOVIMIENTO[m.tipo] || m.tipo }));
+          const etiqueta = m.ordenId ? `Usado en la orden #${m.ordenId}` : (ETIQUETAS_MOVIMIENTO[m.tipo] || m.tipo);
+          item.appendChild(crear('span', { texto: etiqueta }));
           const signo = m.cantidad > 0 && m.tipo === 'AJUSTE' ? '+' : '';
           item.appendChild(crear('span', { clase: 'cantidad', texto: `${signo}${m.cantidad} (queda ${m.stockResultante})` }));
           item.appendChild(crear('span', { clase: 'fecha', texto: fechas.format(new Date(`${m.fecha.replace(' ', 'T')}Z`)) }));

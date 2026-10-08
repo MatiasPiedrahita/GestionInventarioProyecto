@@ -12,9 +12,9 @@ function leerId(req) {
 /**
  * Endpoints de órdenes de trabajo.
  * @param {object} servicio Servicio de órdenes.
- * @param {{ puedenCrear: Function }} permisos Middlewares de autorización por rol.
+ * @param {{ puedenCrear: Function, puedenTrabajar: Function }} permisos Middlewares de autorización por rol.
  */
-function crearRutasOrdenes(servicio, { puedenCrear }) {
+function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar }) {
   const router = express.Router();
 
   router.get('/', (req, res) => {
@@ -28,6 +28,10 @@ function crearRutasOrdenes(servicio, { puedenCrear }) {
 
   router.get('/:id', (req, res) => {
     res.json(servicio.obtener(leerId(req), req.usuario));
+  });
+
+  router.post('/:id/repuestos', puedenTrabajar, (req, res) => {
+    res.status(201).json(servicio.registrarRepuestos(leerId(req), req.body, req.usuario));
   });
 
   return router;

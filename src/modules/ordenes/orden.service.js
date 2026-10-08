@@ -1,13 +1,16 @@
 const { validarNuevaOrden } = require('./orden.validator');
+const { validarRepuestosUsados } = require('./repuestos-usados.validator');
+const { ESTADOS } = require('./estados');
 const { ROLES } = require('../auth/roles');
-const { ErrorDeValidacion, NoEncontrado, SinPermiso } = require('../../shared/errors');
+const { ErrorDeValidacion, NoEncontrado, SinPermiso, Conflicto } = require('../../shared/errors');
 
 /**
  * Lógica de las órdenes de trabajo.
  * @param {object} repositorio Repositorio de órdenes.
  * @param {object} usuarios Repositorio de usuarios (para validar el mecánico asignado).
+ * @param {object} repuestos Repositorio de repuestos (para descontar stock).
  */
-function crearServicioOrdenes(repositorio, usuarios) {
+function crearServicioOrdenes(repositorio, usuarios, repuestos) {
   /** Un mecánico solo ve y trabaja sus propias órdenes; los demás roles ven todas. */
   function verificarAcceso(orden, usuario) {
     if (usuario.rol === ROLES.MECANICO && orden.mecanico.id !== usuario.id) {
@@ -52,11 +55,70 @@ function crearServicioOrdenes(repositorio, usuarios) {
       });
     },
 
+    /** Detalle completo: datos de la orden más los repuestos usados y su total. */
     obtener(id, usuario) {
       const orden = repositorio.buscarPorId(id);
       if (!orden) throw new NoEncontrado(`No existe la orden #${id}`);
       verificarAcceso(orden, usuario);
-      return orden;
+      const usados = repositorio.listarRepuestosDeOrden(id);
+      const total = usados.reduce((suma, r) => suma + r.subtotal, 0);
+      return { ...orden, repuestos: usados, totalRepuestos: Math.round(total * 100) / 100 };
+    },
+
+    /**
+     * HU-04: asocia repuestos del inventario a la orden y descuenta el stock.
+     * Es "todo o nada": si un repuesto no existe o no alcanza el stock, no se
+     * registra ninguno y se informa cada problema.
+     */
+    registrarRepuestos(id, entrada, usuario) {
+      const orden = this.obtener(id, usuario);
+      if (orden.estado !== ESTADOS.EN_PROCESO) {
+        throw new Conflicto(`La orden #${id} está ${orden.estadoNombre.toLowerCase()}; solo se registran repuestos en órdenes en proceso`);
+      }
+
+      const resultado = validarRepuestosUsados(entrada);
+      if (!resultado.valido) throw new ErrorDeValidacion(resultado.errores);
+
+      const problemas = [];
+      const preparados = resultado.valor.map(({ repuestoId, cantidad }, indice) => {
+        const repuesto = repuestos.buscarPorId(repuestoId);
+        if (!repuesto) {
+          problemas.push({ campo: `items[${indice}].repuestoId`, mensaje: `El repuesto ${repuestoId} no existe o fue dado de baja` });
+        } else if (repuesto.stockActual < cantidad) {
+          problemas.push({
+            campo: `items[${indice}].cantidad`,
+            mensaje: `Stock insuficiente de ${repuesto.sku}: hay ${repuesto.stockActual} y se piden ${cantidad}`,
+          });
+        }
+        return { repuesto, cantidad };
+      });
+      if (problemas.some((p) => p.campo.endsWith('repuestoId'))) throw new ErrorDeValidacion(problemas);
+      if (problemas.length > 0) throw new Conflicto('No hay stock suficiente; no se registró ningún repuesto', problemas);
+
+      repositorio.enTransaccion(() => {
+        preparados.forEach(({ repuesto, cantidad }) => {
+          if (!repuestos.descontarStock(repuesto.id, cantidad)) {
+            throw new Conflicto(`El stock de ${repuesto.sku} cambió mientras se registraba; intenta de nuevo`);
+          }
+          repositorio.insertarDetalle({
+            ordenId: id,
+            repuestoId: repuesto.id,
+            cantidad,
+            costoUnitario: repuesto.costo,
+            registradoPor: usuario.id,
+          });
+          repuestos.registrarMovimiento({
+            repuestoId: repuesto.id,
+            tipo: 'USO_EN_ORDEN',
+            cantidad: -cantidad,
+            stockResultante: repuesto.stockActual - cantidad,
+            detalle: `Usado en la orden #${id} (${orden.vehiculo.placa})`,
+            ordenId: id,
+          });
+        });
+      });
+
+      return this.obtener(id, usuario);
     },
 
     listar(usuario) {
