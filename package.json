@@ -12,8 +12,11 @@
     "dev": "node --disable-warning=ExperimentalWarning --watch --env-file-if-exists=.env src/server.js",
     "build": "node --disable-warning=ExperimentalWarning scripts/build.js",
     "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/seed.js",
+    "seed:historial": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/seed-historial.js",
     "test": "node --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",
     "test:cobertura": "node --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js --coverage",
+    "test:python": "node scripts/prediccion-python.js -m pytest",
+    "prediccion:instalar": "node --env-file-if-exists=.env scripts/prediccion-instalar.js",
     "usuario:crear": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/crear-usuario.js"
   },
   "jest": {
@@ -25,6 +28,14 @@
     "coverageReporters": [
       "text",
       "lcov"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/.venv/",
+      "<rootDir>/prediccion/"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/.venv/"
     ]
   },
   "keywords": [
