@@ -34,6 +34,17 @@ function crearRepositorioUsuarios(db) {
     borrarOtrasSesiones: db.prepare('DELETE FROM sesiones WHERE usuario_id = ? AND token_hash <> ?'),
     registrarFallo: db.prepare('UPDATE usuarios SET intentos_fallidos = @intentos, bloqueado_hasta = @bloqueadoHasta WHERE id = @id'),
     reiniciarFallos: db.prepare('UPDATE usuarios SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE id = ?'),
+    // Estado de cada cuenta para el panel de administración: bloqueo vigente y sesiones abiertas.
+    conEstado: db.prepare(`
+      SELECT u.*,
+             (u.bloqueado_hasta IS NOT NULL AND u.bloqueado_hasta > @ahora) AS bloqueado,
+             (SELECT COUNT(*) FROM sesiones s WHERE s.usuario_id = u.id AND s.expira_en > @ahora) AS sesiones_abiertas
+        FROM usuarios u
+       ORDER BY u.activo DESC, u.nombre COLLATE NOCASE
+    `),
+    actualizarDatos: db.prepare('UPDATE usuarios SET nombre = @nombre, rol = @rol, email = @email WHERE id = @id'),
+    cambiarActivo: db.prepare('UPDATE usuarios SET activo = @activo WHERE id = @id'),
+    activosPorRol: db.prepare('SELECT COUNT(*) AS n FROM usuarios WHERE rol = ? AND activo = 1'),
     actualizarPassword: db.prepare(`
       UPDATE usuarios
          SET password_hash = @passwordHash, debe_cambiar_password = @debeCambiarPassword,
@@ -60,6 +71,23 @@ function crearRepositorioUsuarios(db) {
     },
     listarPorRol(rol) {
       return sentencias.porRol.all(rol).map(aDominio);
+    },
+    listarConEstado(ahora) {
+      return sentencias.conEstado.all({ ahora }).map((fila) => ({
+        ...aDominio(fila),
+        bloqueado: fila.bloqueado === 1,
+        sesionesAbiertas: fila.sesiones_abiertas,
+        creadoEn: fila.creado_en,
+      }));
+    },
+    actualizarDatos(id, { nombre, rol, email }) {
+      sentencias.actualizarDatos.run({ id, nombre, rol, email });
+    },
+    cambiarActivo(id, activo) {
+      sentencias.cambiarActivo.run({ id, activo: activo ? 1 : 0 });
+    },
+    contarActivosPorRol(rol) {
+      return sentencias.activosPorRol.get(rol).n;
     },
     crearSesion(tokenHash, usuarioId, expiraEn) {
       sentencias.insertarSesion.run(tokenHash, usuarioId, expiraEn);
