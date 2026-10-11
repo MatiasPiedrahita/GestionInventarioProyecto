@@ -97,4 +97,4 @@ function validarNuevaOrden(entrada, { anioActual = new Date().getFullYear() } = 
   };
 }
 
-module.exports = { validarNuevaOrden, normalizarPlaca };
+module.exports = { validarNuevaOrden, normalizarPlaca, PATRON_PLACA, PATRON_TELEFONO };
