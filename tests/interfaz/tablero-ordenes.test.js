@@ -133,8 +133,12 @@ describe('Interfaz · tablero Kanban y cambio de estado (HU-07)', () => {
     expect(nav.visible('#formulario-repuesto-usado')).toBe(false);
   });
 
-  test('la recepcionista ve el tablero sin acciones ni arrastre', async () => {
+  test('la recepcionista ve el tablero sin acciones ni arrastre, pero sí el formulario para recibir vehículos', async () => {
     await entrarAlTablero('recepcionista');
+
+    expect(nav.visible('#panel-nueva-orden')).toBe(true);
+    expect(nav.visible('#campo-mecanico')).toBe(true);
+    expect(nav.visible('#franja-mi-resumen')).toBe(false);
 
     const [tarjeta] = tarjetasDe('EN_PROCESO');
     expect(botonesDe(tarjeta)).toEqual(['Abrir']);
