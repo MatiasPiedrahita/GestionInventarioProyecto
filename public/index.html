@@ -281,6 +281,11 @@
         </div>
       </header>
 
+      <!-- Mi resumen: solo para el mecánico -->
+      <div class="contenedor contenedor--franja" id="franja-mi-resumen" hidden>
+        <div class="indicadores indicadores--compactos" id="mi-resumen" aria-label="Mi resumen"></div>
+      </div>
+
       <div class="disposicion" id="disposicion-ordenes">
         <section class="panel panel--formulario" id="panel-nueva-orden" aria-labelledby="titulo-nueva-orden">
           <h2 id="titulo-nueva-orden">Nueva orden</h2>
@@ -304,6 +309,7 @@
                 <input id="orden-cliente" name="cliente.nombre" required>
                 <p class="campo__error" data-error="cliente.nombre"></p>
               </div>
+              <p class="pista" id="pista-cliente" role="status"></p>
               <div class="campo">
                 <label for="orden-email">Correo <span class="opcional">(opcional)</span></label>
                 <input id="orden-email" name="cliente.email" type="email">
@@ -337,6 +343,7 @@
                   <p class="campo__error" data-error="vehiculo.modelo"></p>
                 </div>
               </div>
+              <p class="pista" id="pista-vehiculo" role="status"></p>
             </fieldset>
 
             <fieldset>
@@ -435,6 +442,46 @@
             <button type="button" class="boton boton--secundario boton--chico" id="pagina-siguiente">Siguiente</button>
           </nav>
           </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Vista: clientes y vehículos (recepción, dueño y administrador) -->
+    <section class="vista" data-vista="clientes" hidden>
+      <header class="cabecera">
+        <div>
+          <h1>Clientes y vehículos</h1>
+          <p class="resumen" id="resumen-clientes" aria-live="polite"></p>
+        </div>
+      </header>
+
+      <div class="contenedor">
+        <section class="panel" aria-labelledby="titulo-directorio">
+          <div class="barra">
+            <h2 id="titulo-directorio">Directorio</h2>
+            <input type="search" id="busqueda-clientes" placeholder="Nombre, documento, teléfono o placa" aria-label="Buscar cliente">
+          </div>
+          <p class="aviso" id="aviso-clientes" role="status"></p>
+          <div class="tabla-contenedor">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" class="col-nombre">Cliente</th>
+                  <th scope="col">Contacto</th>
+                  <th scope="col" class="num">Vehículos</th>
+                  <th scope="col" class="num">Órdenes</th>
+                  <th scope="col">Última orden</th>
+                  <th scope="col" class="col-acciones"><span class="sr-only">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody id="cuerpo-clientes"></tbody>
+            </table>
+          </div>
+          <nav class="paginacion" id="paginacion-clientes" aria-label="Páginas del directorio">
+            <button type="button" class="boton boton--secundario boton--chico" id="clientes-anterior">Anterior</button>
+            <span id="clientes-pagina"></span>
+            <button type="button" class="boton boton--secundario boton--chico" id="clientes-siguiente">Siguiente</button>
+          </nav>
         </section>
       </div>
     </section>
@@ -608,6 +655,62 @@
     </section>
   </dialog>
 
+  <dialog id="dialogo-cliente" class="dialogo-orden" aria-labelledby="titulo-cliente">
+    <header class="dialogo-orden__cabecera">
+      <h2 id="titulo-cliente">Cliente</h2>
+      <span class="detalle" id="documento-cliente"></span>
+      <form method="dialog"><button class="boton boton--texto" aria-label="Cerrar ficha del cliente">Cerrar</button></form>
+    </header>
+
+    <section class="bloque-orden" aria-labelledby="titulo-contacto">
+      <h3 id="titulo-contacto">Datos de contacto</h3>
+      <form id="formulario-cliente" novalidate>
+        <div class="campo">
+          <label for="cliente-nombre">Nombre</label>
+          <input id="cliente-nombre" name="nombre" maxlength="120" required>
+          <p class="campo__error" data-error="nombre"></p>
+        </div>
+        <div class="fila-campos">
+          <div class="campo">
+            <label for="cliente-telefono">Teléfono</label>
+            <input id="cliente-telefono" name="telefono" type="tel" required>
+            <p class="campo__error" data-error="telefono"></p>
+          </div>
+          <div class="campo">
+            <label for="cliente-email">Correo <span class="opcional">(opcional)</span></label>
+            <input id="cliente-email" name="email" type="email">
+            <p class="campo__error" data-error="email"></p>
+          </div>
+        </div>
+        <p class="aviso" id="aviso-contacto" role="status"></p>
+        <button type="submit" class="boton boton--secundario">Guardar contacto</button>
+      </form>
+    </section>
+
+    <section class="bloque-orden" aria-labelledby="titulo-vehiculos-cliente">
+      <h3 id="titulo-vehiculos-cliente">Vehículos</h3>
+      <ul class="lista-vehiculos" id="vehiculos-cliente"></ul>
+    </section>
+
+    <section class="bloque-orden" aria-labelledby="titulo-historial-cliente">
+      <h3 id="titulo-historial-cliente">Historial de órdenes</h3>
+      <div class="tabla-contenedor">
+        <table class="tabla-compacta">
+          <thead>
+            <tr>
+              <th scope="col">Orden</th>
+              <th scope="col">Vehículo</th>
+              <th scope="col">Problema</th>
+              <th scope="col">Mecánico</th>
+              <th scope="col">Estado</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo-historial-cliente"></tbody>
+        </table>
+      </div>
+    </section>
+  </dialog>
+
   <dialog id="dialogo-estado" aria-labelledby="titulo-cambio-estado">
     <form id="formulario-estado" novalidate>
       <h2 id="titulo-cambio-estado">Cambiar estado</h2>
@@ -665,6 +768,7 @@
   <script src="js/vistas/cuenta.js"></script>
   <script src="js/vistas/administracion.js"></script>
   <script src="js/vistas/panel.js"></script>
+  <script src="js/vistas/clientes.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

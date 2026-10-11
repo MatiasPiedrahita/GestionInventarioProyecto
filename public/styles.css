@@ -648,3 +648,17 @@ tr.inactivo td { color: var(--tinta-suave); }
 @media (max-width: 960px) {
   .rejilla-graficos { grid-template-columns: 1fr; }
 }
+
+/* ===================== Recepción: clientes y vehículos; resumen del mecánico ===================== */
+.contenedor--franja { padding-bottom: 0; }
+.indicadores--compactos { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.indicadores--compactos .indicador { padding: 0.7rem 1rem; }
+.indicadores--compactos .indicador__valor { font-size: 1.6rem; }
+
+.pista { margin: -0.25rem 0 0.6rem; font-size: 0.875rem; color: var(--ok); }
+.pista:empty { display: none; }
+
+.lista-vehiculos { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.lista-vehiculos li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.lista-vehiculos .detalle { margin-left: auto; }
+#formulario-cliente { max-width: 34rem; }
