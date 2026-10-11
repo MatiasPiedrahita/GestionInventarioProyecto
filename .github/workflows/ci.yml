@@ -46,6 +46,27 @@ jobs:
           path: coverage/
           retention-days: 7
 
+  modelo:
+    name: Modelo de predicción (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: prediccion/requirements-dev.txt
+
+      - name: Instalar las librerías del modelo
+        run: pip install -r prediccion/requirements-dev.txt
+
+      - name: Ejecutar las pruebas del modelo (pytest)
+        working-directory: prediccion
+        run: python -m pytest
+
   auditoria:
     name: Análisis de vulnerabilidades de dependencias
     runs-on: ubuntu-latest
@@ -64,3 +85,13 @@ jobs:
 
       - name: npm audit (falla si hay vulnerabilidades altas o críticas)
         run: npm audit --audit-level=high
+
+      - name: Instalar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: pip-audit (vulnerabilidades conocidas en las librerías de Python)
+        run: |
+          pip install pip-audit
+          pip-audit -r prediccion/requirements.txt
