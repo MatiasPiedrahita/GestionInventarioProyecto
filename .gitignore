@@ -23,3 +23,9 @@ Thumbs.db
 *.log
 
 CLAUDE.md
+
+# Python (modelo de predicción): entorno virtual y archivos generados
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
