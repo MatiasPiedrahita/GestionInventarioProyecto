@@ -1,12 +1,19 @@
 const { validarRepuesto } = require('./repuesto.validator');
 const { parsearCsv } = require('./csv');
+const { ACCIONES } = require('../auditoria/acciones');
+const { SIN_AUDITORIA } = require('../auditoria/auditoria.service');
 const { ErrorDeValidacion, NoEncontrado, Conflicto } = require('../../shared/errors');
 
 /**
  * Lógica de negocio de la HU-01 "Gestión de inventario de repuestos".
  * Orquesta validación, reglas (SKU único, historial) y persistencia.
+ *
+ * Las operaciones sensibles reciben el usuario que las hace para dejarlo en
+ * la auditoría; es opcional porque los scripts (seed) no tienen sesión.
  */
-function crearServicioInventario(repositorio) {
+function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}) {
+  const idDe = (usuario) => (usuario ? usuario.id : null);
+
   function exigirValido(entrada) {
     const resultado = validarRepuesto(entrada);
     if (!resultado.valido) throw new ErrorDeValidacion(resultado.errores);
@@ -54,7 +61,7 @@ function crearServicioInventario(repositorio) {
       });
     },
 
-    actualizar(id, entrada) {
+    actualizar(id, entrada, usuario) {
       const anterior = exigirExistente(id);
       const datos = exigirValido(entrada);
       exigirSkuDisponible(datos.sku, id);
@@ -69,12 +76,19 @@ function crearServicioInventario(repositorio) {
             stockResultante: datos.stockActual,
             detalle: 'Ajuste manual de stock',
           });
+          auditoria.registrar({
+            usuarioId: idDe(usuario),
+            accion: ACCIONES.REPUESTO_AJUSTE,
+            entidad: 'repuesto',
+            entidadId: id,
+            detalle: `${anterior.sku}: de ${anterior.stockActual} a ${datos.stockActual} unidades`,
+          });
         }
         return repositorio.buscarPorId(id);
       });
     },
 
-    darDeBaja(id) {
+    darDeBaja(id, usuario) {
       const repuesto = exigirExistente(id);
       repositorio.enTransaccion(() => {
         repositorio.darDeBaja(id);
@@ -84,6 +98,13 @@ function crearServicioInventario(repositorio) {
           cantidad: 0,
           stockResultante: repuesto.stockActual,
           detalle: 'Repuesto dado de baja del catálogo',
+        });
+        auditoria.registrar({
+          usuarioId: idDe(usuario),
+          accion: ACCIONES.REPUESTO_BAJA,
+          entidad: 'repuesto',
+          entidadId: id,
+          detalle: `${repuesto.sku} (${repuesto.nombre}), con ${repuesto.stockActual} unidades`,
         });
       });
     },
@@ -97,7 +118,7 @@ function crearServicioInventario(repositorio) {
      * Carga masiva desde CSV. Es "todo o nada": si una sola fila falla,
      * no se guarda ninguna y se devuelve el detalle de cada error por fila.
      */
-    importarCsv(textoCsv) {
+    importarCsv(textoCsv, usuario) {
       let resultado;
       try {
         resultado = parsearCsv(textoCsv);
@@ -151,6 +172,12 @@ function crearServicioInventario(repositorio) {
         }),
       );
 
+      auditoria.registrar({
+        usuarioId: idDe(usuario),
+        accion: ACCIONES.REPUESTO_IMPORTACION,
+        entidad: 'repuesto',
+        detalle: `${creados.length} repuesto(s) cargados por CSV`,
+      });
       return { cantidad: creados.length, creados };
     },
   };
