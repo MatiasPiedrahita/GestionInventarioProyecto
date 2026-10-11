@@ -437,3 +437,79 @@ textarea[aria-invalid='true'], select[aria-invalid='true'] { border-color: var(-
 @media (max-width: 1100px) {
   .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ===================== Tablero Kanban y cambio de estado (HU-07) ===================== */
+.alternador { display: inline-flex; border: 1px solid var(--overol); border-radius: var(--radio-control); overflow: hidden; }
+.alternador__opcion {
+  font: 600 0.875rem var(--fuente);
+  background: transparent;
+  color: var(--overol);
+  border: 0;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+}
+.alternador__opcion + .alternador__opcion { border-left: 1px solid var(--overol); }
+.alternador__opcion[aria-pressed='true'] { background: var(--overol); color: #fff; }
+
+.tablero { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; align-items: start; }
+.tablero__columna {
+  background: var(--fondo);
+  border: 2px solid transparent;
+  border-top: 4px solid var(--overol);
+  border-radius: var(--radio-control);
+  padding: 0.75rem;
+  min-height: 12rem;
+}
+.tablero__columna[data-estado='FINALIZADA'] { border-top-color: var(--ok); }
+.tablero__columna[data-estado='CANCELADA'] { border-top-color: var(--tinta-suave); }
+.tablero__columna--destino { border-color: var(--overol); border-style: dashed; background: #dde6f1; }
+.tablero__columna h3 {
+  font: 700 1.15rem var(--fuente-condensada);
+  margin: 0 0 0.6rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.tablero__conteo { font: 600 0.9rem var(--fuente); color: var(--tinta-suave); font-variant-numeric: tabular-nums; }
+.tablero__tarjetas { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.tablero__vacio { color: var(--tinta-suave); font-size: 0.875rem; text-align: center; padding: 1rem 0.5rem; }
+
+.tarjeta {
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-control);
+  padding: 0.7rem 0.75rem 0.5rem;
+}
+.tarjeta[draggable='true'] { cursor: grab; }
+.tarjeta--arrastrada { opacity: 0.45; }
+.tarjeta p { margin: 0.3rem 0 0; }
+.tarjeta__cabecera { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+.tarjeta__vehiculo { font-weight: 600; }
+.tarjeta__problema { font-size: 0.925rem; }
+.tarjeta__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--linea);
+}
+.tarjeta__acciones .boton--texto { padding-left: 0; margin-right: auto; color: var(--overol); }
+
+.boton--peligro { color: var(--oxido); border-color: var(--oxido); }
+.boton--peligro:hover { background: var(--oxido-claro); }
+
+.historial--estados { margin: 0.75rem 0 0; max-height: 12rem; }
+.historial--estados li { grid-template-columns: 1fr; }
+.historial .motivo { color: var(--tinta); font-size: 0.9rem; font-style: italic; }
+tr.devuelto td { color: var(--tinta-suave); }
+tr.devuelto td.num { text-decoration: line-through; }
+
+#dialogo-estado h2 { margin-bottom: 0.5rem; }
+#dialogo-estado .interruptor { margin-bottom: 0.5rem; }
+
+@media (max-width: 860px) {
+  .tablero { grid-template-columns: 1fr; }
+  .tablero__columna { min-height: 0; }
+}
