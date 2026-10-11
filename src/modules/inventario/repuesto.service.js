@@ -3,6 +3,7 @@ const { validarEntrada } = require('./entrada.validator');
 const { parsearCsv } = require('./csv');
 const { ACCIONES } = require('../auditoria/acciones');
 const { SIN_AUDITORIA } = require('../auditoria/auditoria.service');
+const { SIN_EVENTOS } = require('../../shared/eventos');
 const { ErrorDeValidacion, NoEncontrado, Conflicto } = require('../../shared/errors');
 
 /**
@@ -11,8 +12,10 @@ const { ErrorDeValidacion, NoEncontrado, Conflicto } = require('../../shared/err
  *
  * Las operaciones sensibles reciben el usuario que las hace para dejarlo en
  * la auditoría; es opcional porque los scripts (seed) no tienen sesión.
+ * Después de cada cambio de stock se avisa con eventos.stockCambiado, para
+ * que las alertas de stock bajo se actualicen al instante.
  */
-function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}) {
+function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA, eventos = SIN_EVENTOS } = {}) {
   const idDe = (usuario) => (usuario ? usuario.id : null);
 
   function exigirValido(entrada) {
@@ -49,7 +52,7 @@ function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}
     crear(entrada) {
       const datos = exigirValido(entrada);
       exigirSkuDisponible(datos.sku);
-      return repositorio.enTransaccion(() => {
+      const creado = repositorio.enTransaccion(() => {
         const id = repositorio.insertar(datos);
         repositorio.registrarMovimiento({
           repuestoId: id,
@@ -60,13 +63,15 @@ function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}
         });
         return repositorio.buscarPorId(id);
       });
+      eventos.stockCambiado([creado.id]);
+      return creado;
     },
 
     actualizar(id, entrada, usuario) {
       const anterior = exigirExistente(id);
       const datos = exigirValido(entrada);
       exigirSkuDisponible(datos.sku, id);
-      return repositorio.enTransaccion(() => {
+      const actualizado = repositorio.enTransaccion(() => {
         repositorio.actualizar(id, datos);
         const diferencia = datos.stockActual - anterior.stockActual;
         if (diferencia !== 0) {
@@ -87,6 +92,9 @@ function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}
         }
         return repositorio.buscarPorId(id);
       });
+      // También si solo cambió el mínimo: un repuesto puede quedar por debajo sin que se mueva el stock.
+      eventos.stockCambiado([id]);
+      return actualizado;
     },
 
     darDeBaja(id, usuario) {
@@ -108,6 +116,7 @@ function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}
           detalle: `${repuesto.sku} (${repuesto.nombre}), con ${repuesto.stockActual} unidades`,
         });
       });
+      eventos.stockCambiado([id]);
     },
 
     /**
@@ -121,7 +130,7 @@ function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}
       if (!resultado.valido) throw new ErrorDeValidacion(resultado.errores);
       const { cantidad, detalle } = resultado.valor;
 
-      return repositorio.enTransaccion(() => {
+      const actualizado = repositorio.enTransaccion(() => {
         const stockResultante = repositorio.sumarStock(id, cantidad);
         repositorio.registrarMovimiento({
           repuestoId: id,
@@ -139,6 +148,8 @@ function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}
         });
         return repositorio.buscarPorId(id);
       });
+      eventos.stockCambiado([id]);
+      return actualizado;
     },
 
     historial(id) {
@@ -210,6 +221,7 @@ function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}
         entidad: 'repuesto',
         detalle: `${creados.length} repuesto(s) cargados por CSV`,
       });
+      eventos.stockCambiado(creados.map((repuesto) => repuesto.id));
       return { cantidad: creados.length, creados };
     },
   };

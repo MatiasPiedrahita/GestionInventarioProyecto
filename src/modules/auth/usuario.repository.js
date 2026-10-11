@@ -20,6 +20,7 @@ function crearRepositorioUsuarios(db) {
     porUsuario: db.prepare('SELECT * FROM usuarios WHERE usuario = ?'),
     porId: db.prepare('SELECT * FROM usuarios WHERE id = ?'),
     porRol: db.prepare('SELECT * FROM usuarios WHERE rol = ? AND activo = 1 ORDER BY nombre COLLATE NOCASE'),
+    gestionan: db.prepare("SELECT * FROM usuarios WHERE rol IN ('dueno', 'administrador') AND activo = 1 ORDER BY id"),
     insertarSesion: db.prepare(`
       INSERT INTO sesiones (token_hash, usuario_id, expira_en) VALUES (?, ?, ?)
     `),
@@ -68,6 +69,10 @@ function crearRepositorioUsuarios(db) {
     },
     buscarPorId(id) {
       return aDominio(sentencias.porId.get(id));
+    },
+    /** Dueños y administradores activos: quienes reciben los avisos del inventario. */
+    listarQuienesGestionan() {
+      return sentencias.gestionan.all().map(aDominio);
     },
     listarPorRol(rol) {
       return sentencias.porRol.all(rol).map(aDominio);

@@ -6,6 +6,7 @@ const { ESTADOS, NOMBRE_ESTADO, evaluarTransicion } = require('./estados');
 const { ROLES } = require('../auth/roles');
 const { ACCIONES } = require('../auditoria/acciones');
 const { SIN_AUDITORIA } = require('../auditoria/auditoria.service');
+const { SIN_EVENTOS } = require('../../shared/eventos');
 const { ErrorDeValidacion, NoEncontrado, SinPermiso, Conflicto } = require('../../shared/errors');
 
 const LIMITE_NOTAS = 4000;
@@ -17,9 +18,9 @@ const DIA_MS = 24 * 3600 * 1000;
  * @param {object} repositorio Repositorio de órdenes.
  * @param {object} usuarios Repositorio de usuarios (para validar el mecánico asignado).
  * @param {object} repuestos Repositorio de repuestos (para descontar stock).
- * @param {{ auditoria?: object, ahora?: () => Date }} opciones
+ * @param {{ auditoria?: object, eventos?: object, ahora?: () => Date }} opciones
  */
-function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SIN_AUDITORIA, ahora = () => new Date() } = {}) {
+function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SIN_AUDITORIA, eventos = SIN_EVENTOS, ahora = () => new Date() } = {}) {
   /** Un mecánico solo ve y trabaja sus propias órdenes; los demás roles ven todas. */
   function verificarAcceso(orden, usuario) {
     if (usuario.rol === ROLES.MECANICO && orden.mecanico.id !== usuario.id) {
@@ -50,7 +51,7 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SI
       const { cliente, vehiculo, descripcion, mecanicoId } = resultado.valor;
       const mecanicoAsignado = resolverMecanico(mecanicoId, usuario);
 
-      return repositorio.enTransaccion(() => {
+      const orden = repositorio.enTransaccion(() => {
         const clienteId = repositorio.guardarCliente(cliente);
         const vehiculoId = repositorio.guardarVehiculo(vehiculo, clienteId);
         const id = repositorio.insertarOrden({
@@ -63,6 +64,9 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SI
         repositorio.registrarCambioDeEstado({ ordenId: id, estadoNuevo: ESTADOS.EN_PROCESO, usuarioId: usuario.id });
         return repositorio.buscarPorId(id);
       });
+      // Si la creó otra persona (recepción, dueño), el mecánico se entera por la campana.
+      if (orden.mecanico.id !== usuario.id) eventos.ordenAsignada(orden, usuario);
+      return orden;
     },
 
     /**
@@ -130,6 +134,7 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SI
           });
         });
       });
+      eventos.stockCambiado(preparados.map(({ repuesto }) => repuesto.id));
 
       return this.obtener(id, usuario);
     },
@@ -212,6 +217,9 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SI
           detalle: `${orden.estadoNombre} → ${NOMBRE_ESTADO[estado]}${motivo ? `: ${motivo}` : ''}`,
         });
       });
+      if (estado === ESTADOS.CANCELADA && devolverRepuestos) {
+        eventos.stockCambiado(orden.repuestos.filter((r) => !r.devuelto).map((r) => r.repuestoId));
+      }
 
       return this.obtener(id, usuario);
     },
@@ -247,7 +255,9 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SI
           detalle: `De ${orden.mecanico.nombre} a ${destino.nombre}`,
         });
       });
-      return this.obtener(id, usuario);
+      const reasignada = this.obtener(id, usuario);
+      eventos.ordenAsignada(reasignada, usuario);
+      return reasignada;
     },
 
     /** "Mi resumen" del mecánico: su carga de hoy y lo que cerró en los últimos 30 días. */

@@ -12,7 +12,7 @@ const { crearRutasAuth } = require('./modules/auth/auth.routes');
 const { ROLES } = require('./modules/auth/roles');
 const { crearRepositorioOrdenes } = require('./modules/ordenes/orden.repository');
 const { crearServicioOrdenes } = require('./modules/ordenes/orden.service');
-const { crearRutasOrdenes } = require('./modules/ordenes/orden.routes');
+const { crearRutasOrdenes, leerId } = require('./modules/ordenes/orden.routes');
 const { crearRepositorioAuditoria } = require('./modules/auditoria/auditoria.repository');
 const { crearServicioAuditoria } = require('./modules/auditoria/auditoria.service');
 const { crearServicioUsuarios } = require('./modules/usuarios/usuario.service');
@@ -24,6 +24,13 @@ const { crearServicioPanel } = require('./modules/panel/panel.service');
 const { crearRepositorioClientes } = require('./modules/clientes/cliente.repository');
 const { crearServicioClientes } = require('./modules/clientes/cliente.service');
 const { crearRutasClientes } = require('./modules/clientes/cliente.routes');
+const { crearTransporteDeCorreo } = require('./modules/notificaciones/correo');
+const { crearRepositorioNotificaciones } = require('./modules/notificaciones/notificacion.repository');
+const { crearServicioNotificaciones } = require('./modules/notificaciones/notificacion.service');
+const { crearRutasNotificaciones } = require('./modules/notificaciones/notificacion.routes');
+const { crearRepositorioAlertas } = require('./modules/alertas/alerta.repository');
+const { crearServicioAlertas } = require('./modules/alertas/alerta.service');
+const { crearRutasAlertas } = require('./modules/alertas/alerta.routes');
 const { manejadorDeErrores } = require('./shared/errorHandler');
 
 /**
@@ -55,9 +62,14 @@ const cabecerasDeSeguridad = helmet({
  * Construye la aplicación. Recibe sus dependencias por parámetro para que
  * las pruebas usen una base en memoria, aislada y desechable.
  *
- * @param {{ db?: import('node:sqlite').DatabaseSync, ahora?: () => Date }} opciones
+ * @param {{ db?: import('node:sqlite').DatabaseSync, ahora?: () => Date, transporteDeCorreo?: object, urlDeLaAplicacion?: string }} opciones
  */
-function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
+function crearApp({
+  db = crearConexion(':memory:'),
+  ahora,
+  transporteDeCorreo = crearTransporteDeCorreo(),
+  urlDeLaAplicacion = process.env.APP_URL || null,
+} = {}) {
   const app = express();
 
   app.disable('x-powered-by');
@@ -68,11 +80,44 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   const servicioAuditoria = crearServicioAuditoria(crearRepositorioAuditoria(db));
   const repositorioUsuarios = crearRepositorioUsuarios(db);
   const servicioAuth = crearServicioAuth(repositorioUsuarios, { ahora, auditoria: servicioAuditoria });
+  const servicioNotificaciones = crearServicioNotificaciones(crearRepositorioNotificaciones(db), { transporte: transporteDeCorreo });
+  const servicioAlertas = crearServicioAlertas(crearRepositorioAlertas(db), {
+    notificaciones: servicioNotificaciones,
+    destinatarios: () => repositorioUsuarios.listarQuienesGestionan(),
+    auditoria: servicioAuditoria,
+    urlDeLaAplicacion,
+  });
+
+  // Conexión entre módulos: inventario y órdenes avisan; alertas y notificaciones reaccionan.
+  const eventos = {
+    stockCambiado: (ids) => servicioAlertas.alCambiarStock(ids),
+    ordenAsignada: (orden, quien) => servicioNotificaciones.enviar(
+      [orden.mecanico],
+      [{
+        tipo: 'ORDEN_ASIGNADA',
+        titulo: `Te asignaron la orden #${orden.id}`,
+        mensaje: `${orden.vehiculo.placa} · ${orden.vehiculo.marca} ${orden.vehiculo.modelo}: ${orden.descripcion}`,
+        vista: 'ordenes',
+      }],
+      () => ({
+        asunto: `[Taller] Te asignaron la orden #${orden.id} (${orden.vehiculo.placa})`,
+        cuerpo: [
+          `Hola, ${orden.mecanico.nombre}:`,
+          '',
+          `${quien.nombre} te asignó la orden #${orden.id}.`,
+          `Vehículo: ${orden.vehiculo.placa} · ${orden.vehiculo.marca} ${orden.vehiculo.modelo}`,
+          `Problema: ${orden.descripcion}`,
+        ].join('\n'),
+      }),
+    ),
+  };
+
   const repositorioRepuestos = crearRepositorioRepuestos(db);
-  const servicioInventario = crearServicioInventario(repositorioRepuestos, { auditoria: servicioAuditoria });
+  const servicioInventario = crearServicioInventario(repositorioRepuestos, { auditoria: servicioAuditoria, eventos });
   const repositorioOrdenes = crearRepositorioOrdenes(db);
   const servicioOrdenes = crearServicioOrdenes(repositorioOrdenes, repositorioUsuarios, repositorioRepuestos, {
     auditoria: servicioAuditoria,
+    eventos,
     ahora,
   });
   const servicioClientes = crearServicioClientes(crearRepositorioClientes(db), { auditoria: servicioAuditoria });
@@ -84,6 +129,8 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   });
   const servicioSistema = crearServicioSistema(crearRepositorioSistema(db), { ahora });
   const servicioPanel = crearServicioPanel(crearRepositorioPanel(db), { ahora });
+  servicioSistema.registrarSeccion('correo', () => servicioNotificaciones.estadoDelCorreo());
+  servicioSistema.registrarSeccion('alertas', () => servicioAlertas.conteo());
 
   const autenticar = crearAutenticacion(servicioAuth);
   const gestionInventario = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
@@ -109,6 +156,13 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
 
   // --- Rutas protegidas: todo lo demás exige sesión ----------------------------
   app.use('/api', autenticar, exigirPasswordPropia);
+  app.use('/api/notificaciones', crearRutasNotificaciones(servicioNotificaciones));
+  app.use('/api/alertas', gestionInventario, crearRutasAlertas(servicioAlertas));
+  app.get('/api/correos', administracion, (req, res) => res.json(servicioNotificaciones.bandejaDeSalida()));
+  // El mecánico avisa que un repuesto falta para un trabajo (va antes del enrutador de inventario).
+  app.post('/api/repuestos/:id/faltantes', trabajanEnOrdenes, (req, res) => {
+    res.status(201).json(servicioAlertas.reportarFaltante(leerId(req), req.body, req.usuario));
+  });
   app.use('/api/repuestos', crearRutasInventario(servicioInventario, { soloGestion: gestionInventario }));
   app.get('/api/usuarios/mecanicos', (req, res) => res.json(servicioAuth.listarMecanicos()));
   app.use('/api/usuarios', administracion, crearRutasUsuarios(servicioUsuarios));
@@ -143,6 +197,8 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
       sistema: servicioSistema,
       panel: servicioPanel,
       clientes: servicioClientes,
+      notificaciones: servicioNotificaciones,
+      alertas: servicioAlertas,
     },
   };
 }
