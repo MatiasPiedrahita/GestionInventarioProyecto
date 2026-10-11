@@ -3,6 +3,19 @@
 window.Taller.formato = {
   pesos: new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }),
   fechas: new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' }),
+  /** Pesos abreviados para los ejes de los gráficos: $0, $350 mil, $1,2 M. */
+  pesosCortos(valor) {
+    if (valor >= 1e6) return `$${(valor / 1e6).toLocaleString('es-CO', { maximumFractionDigits: 2 })} M`;
+    if (valor >= 1e3) return `$${Math.round(valor / 1e3).toLocaleString('es-CO')} mil`;
+    return `$${Math.round(valor)}`;
+  },
+  /** Duración en horas, dicha como se habla en el taller: "45 min", "6 h", "2,5 días". */
+  duracion(horas) {
+    if (horas < 1) return `${Math.max(1, Math.round(horas * 60))} min`;
+    if (horas < 24) return `${horas.toLocaleString('es-CO', { maximumFractionDigits: 1 })} h`;
+    const dias = horas / 24;
+    return `${dias.toLocaleString('es-CO', { maximumFractionDigits: 1 })} ${dias === 1 ? 'día' : 'días'}`;
+  },
   /** SQLite guarda "2026-10-07 14:30:00" en UTC; esto lo vuelve fecha local legible. */
   fechaSqlite(texto) {
     if (!texto) return '';
