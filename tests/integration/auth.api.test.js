@@ -3,7 +3,7 @@ const { crearContexto, CLAVE_DE_PRUEBA } = require('../helpers/contexto');
 describe('API /api/auth (integración)', () => {
   test.each([
     ['dueno', 'inventario'],
-    ['administrador', 'inventario'],
+    ['administrador', 'administracion'],
     ['mecanico', 'ordenes'],
     ['recepcionista', 'ordenes'],
   ])('login de %s: entrega token, datos públicos y la vista "%s"', async (rol, vista) => {
