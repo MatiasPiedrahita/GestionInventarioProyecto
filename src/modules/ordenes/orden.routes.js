@@ -38,6 +38,14 @@ function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar }) {
     res.json(servicio.actualizarNotas(leerId(req), req.body, req.usuario));
   });
 
+  router.patch('/:id/estado', puedenTrabajar, (req, res) => {
+    res.json(servicio.cambiarEstado(leerId(req), req.body, req.usuario));
+  });
+
+  router.get('/:id/historial', (req, res) => {
+    res.json(servicio.historialDeEstados(leerId(req), req.usuario));
+  });
+
   return router;
 }
 

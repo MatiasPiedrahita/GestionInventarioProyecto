@@ -4,6 +4,10 @@
  * - Mecánico: crea órdenes (quedan a su nombre) y ve solo las suyas.
  * - Dueño y administrador: crean órdenes eligiendo el mecánico y ven todas.
  * - Recepcionista: consulta el listado global con filtros (HU-06), sin modificar nada.
+ *
+ * Las órdenes se ven como lista paginada o como tablero Kanban (HU-07), con
+ * una columna por estado. El estado se cambia arrastrando la tarjeta o con
+ * los botones de cada tarjeta (en tabletas no hay arrastre).
  */
 window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
   const { api, dom, formato } = window.Taller;
@@ -20,6 +24,9 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
   let usuario = null;
 
   const puedeCrear = () => ['mecanico', 'dueno', 'administrador'].includes(usuario.rol);
+  /** Quién registra repuestos, escribe notas y cambia el estado (el mecánico, solo en sus órdenes). */
+  const puedeTrabajar = () => ['mecanico', 'dueno', 'administrador'].includes(usuario.rol);
+  const puedeReabrir = () => ['dueno', 'administrador'].includes(usuario.rol);
   const eligeMecanico = () => ['dueno', 'administrador'].includes(usuario.rol);
 
   /** Convierte los campos "cliente.nombre" del formulario en { cliente: { nombre } }. */
@@ -117,19 +124,251 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
       : `${todas.total} ${todas.total === 1 ? 'orden' : 'órdenes'} en total, ${activas.total} activas.`;
   }
 
-  async function cargar() {
+  function filtrosActuales() {
     const parametros = new URLSearchParams();
     new FormData(formularioFiltros).forEach((valor, clave) => {
       if (String(valor).trim() !== '') parametros.set(clave, String(valor).trim());
     });
-    parametros.set('pagina', pagina);
+    return parametros;
+  }
+
+  async function cargar() {
     try {
-      pintar(await api.pedir(`/api/ordenes?${parametros}`));
+      if (modo === 'tablero') {
+        await cargarTablero();
+      } else {
+        const parametros = filtrosActuales();
+        parametros.set('pagina', pagina);
+        pintar(await api.pedir(`/api/ordenes?${parametros}`));
+      }
       await actualizarResumen();
     } catch (error) {
       dom.aviso(avisoLista, `No se pudieron cargar las órdenes: ${error.message}`, 'error', error.detalles || []);
     }
   }
+
+  // ------------------------------------------------- Tablero Kanban (HU-07)
+  const tablero = $('#tablero-ordenes');
+  const CLAVE_MODO = 'taller.modoOrdenes';
+  const ESTADOS_DEL_TABLERO = ['EN_PROCESO', 'FINALIZADA', 'CANCELADA'];
+  const TARJETAS_POR_COLUMNA = 50;
+  /** Espejo de las reglas del servidor, solo para no ofrecer acciones que la API va a rechazar. */
+  const SIGUIENTES = { EN_PROCESO: ['FINALIZADA', 'CANCELADA'], FINALIZADA: ['EN_PROCESO'], CANCELADA: ['EN_PROCESO'] };
+  const ACCIONES = {
+    FINALIZADA: { texto: 'Finalizar', clase: 'boton boton--chico' },
+    CANCELADA: { texto: 'Cancelar', clase: 'boton boton--secundario boton--chico boton--peligro' },
+    EN_PROCESO: { texto: 'Reabrir', clase: 'boton boton--secundario boton--chico' },
+  };
+  let modo = 'lista';
+
+  function puedePasar(estadoActual, destino) {
+    if (!puedeTrabajar() || !SIGUIENTES[estadoActual].includes(destino)) return false;
+    return destino !== 'EN_PROCESO' || puedeReabrir();
+  }
+
+  function botonesDeEstado(orden) {
+    return SIGUIENTES[orden.estado].filter((destino) => puedePasar(orden.estado, destino)).map((destino) => {
+      const boton = dom.crear('button', { clase: ACCIONES[destino].clase, texto: ACCIONES[destino].texto });
+      boton.type = 'button';
+      boton.dataset.cambiar = orden.id;
+      boton.dataset.destino = destino;
+      boton.setAttribute('aria-label', `${ACCIONES[destino].texto} la orden ${orden.id} de ${orden.vehiculo.placa}`);
+      return boton;
+    });
+  }
+
+  function construirTarjeta(orden) {
+    const tarjeta = dom.crear('li', { clase: 'tarjeta' });
+    tarjeta.dataset.orden = orden.id;
+    tarjeta.dataset.estado = orden.estado;
+    tarjeta.draggable = SIGUIENTES[orden.estado].some((destino) => puedePasar(orden.estado, destino));
+
+    const cabecera = dom.crear('div', { clase: 'tarjeta__cabecera' });
+    cabecera.appendChild(dom.crear('span', { clase: 'placa', texto: orden.vehiculo.placa }));
+    cabecera.appendChild(dom.crear('span', { clase: 'num-orden', texto: `#${orden.id}` }));
+    tarjeta.appendChild(cabecera);
+
+    tarjeta.appendChild(dom.crear('p', { clase: 'tarjeta__vehiculo', texto: `${orden.vehiculo.marca} ${orden.vehiculo.modelo}` }));
+    tarjeta.appendChild(dom.crear('p', { clase: 'tarjeta__problema recortado', texto: orden.descripcion }));
+    const pie = usuario.rol === 'mecanico' ? orden.cliente.nombre : `${orden.cliente.nombre} · ${orden.mecanico.nombre}`;
+    tarjeta.appendChild(dom.crear('p', { clase: 'detalle', texto: pie }));
+
+    const acciones = dom.crear('div', { clase: 'tarjeta__acciones' });
+    const abrir = dom.crear('button', { clase: 'boton boton--texto boton--chico', texto: 'Abrir' });
+    abrir.type = 'button';
+    abrir.dataset.orden = orden.id;
+    abrir.setAttribute('aria-label', `Abrir orden ${orden.id} de ${orden.vehiculo.placa}`);
+    acciones.appendChild(abrir);
+    botonesDeEstado(orden).forEach((boton) => acciones.appendChild(boton));
+    tarjeta.appendChild(acciones);
+    return tarjeta;
+  }
+
+  function pintarColumna(estado, resultado) {
+    const lista = tablero.querySelector(`[data-tarjetas="${estado}"]`);
+    lista.replaceChildren();
+    tablero.querySelector(`[data-conteo="${estado}"]`).textContent = resultado.total;
+    resultado.datos.forEach((orden) => lista.appendChild(construirTarjeta(orden)));
+    if (resultado.datos.length === 0) {
+      lista.appendChild(dom.crear('li', { clase: 'tablero__vacio', texto: 'Sin órdenes' }));
+    } else if (resultado.total > resultado.datos.length) {
+      lista.appendChild(dom.crear('li', {
+        clase: 'tablero__vacio',
+        texto: `Se muestran las ${resultado.datos.length} más recientes de ${resultado.total}. Usa la lista para ver todas.`,
+      }));
+    }
+  }
+
+  async function cargarTablero() {
+    avisoLista.textContent = '';
+    const columnas = await Promise.all(ESTADOS_DEL_TABLERO.map((estado) => {
+      const parametros = filtrosActuales();
+      parametros.set('estado', estado);
+      parametros.set('tamano', TARJETAS_POR_COLUMNA);
+      return api.pedir(`/api/ordenes?${parametros}`);
+    }));
+    ESTADOS_DEL_TABLERO.forEach((estado, i) => pintarColumna(estado, columnas[i]));
+  }
+
+  function aplicarModo(nuevo) {
+    modo = nuevo;
+    try { window.sessionStorage.setItem(CLAVE_MODO, modo); } catch { /* almacenamiento no disponible */ }
+    tablero.hidden = modo !== 'tablero';
+    $('#lista-ordenes').hidden = modo === 'tablero';
+    // En el tablero cada columna ya es un estado: el filtro por estado sobra.
+    $('#campo-filtro-estado').hidden = modo === 'tablero';
+    $('#info-resultados').hidden = modo === 'tablero';
+    document.querySelectorAll('.alternador__opcion').forEach((boton) => {
+      boton.setAttribute('aria-pressed', String(boton.dataset.modo === modo));
+    });
+  }
+
+  document.querySelector('.alternador').addEventListener('click', (evento) => {
+    const boton = evento.target.closest('[data-modo]');
+    if (!boton || boton.dataset.modo === modo) return;
+    aplicarModo(boton.dataset.modo);
+    pagina = 1;
+    cargar();
+  });
+
+  tablero.addEventListener('click', (evento) => {
+    const cambiar = evento.target.closest('button[data-cambiar]');
+    if (cambiar) {
+      pedirCambioDeEstado(Number(cambiar.dataset.cambiar), cambiar.dataset.destino);
+      return;
+    }
+    const abrir = evento.target.closest('button[data-orden]');
+    if (abrir) abrirDetalle(Number(abrir.dataset.orden));
+  });
+
+  // Arrastrar y soltar: la columna solo acepta la tarjeta si la transición es válida para el rol.
+  let arrastrada = null;
+  tablero.addEventListener('dragstart', (evento) => {
+    const tarjeta = evento.target.closest('.tarjeta');
+    if (!tarjeta) return;
+    arrastrada = { id: Number(tarjeta.dataset.orden), estado: tarjeta.dataset.estado };
+    evento.dataTransfer.effectAllowed = 'move';
+    evento.dataTransfer.setData('text/plain', tarjeta.dataset.orden);
+    tarjeta.classList.add('tarjeta--arrastrada');
+  });
+  tablero.addEventListener('dragend', (evento) => {
+    const tarjeta = evento.target.closest('.tarjeta');
+    if (tarjeta) tarjeta.classList.remove('tarjeta--arrastrada');
+    tablero.querySelectorAll('.tablero__columna--destino').forEach((c) => c.classList.remove('tablero__columna--destino'));
+    arrastrada = null;
+  });
+  tablero.addEventListener('dragover', (evento) => {
+    const columna = evento.target.closest('.tablero__columna');
+    if (!columna || !arrastrada || !puedePasar(arrastrada.estado, columna.dataset.estado)) return;
+    evento.preventDefault();
+    evento.dataTransfer.dropEffect = 'move';
+    columna.classList.add('tablero__columna--destino');
+  });
+  tablero.addEventListener('dragleave', (evento) => {
+    const columna = evento.target.closest('.tablero__columna');
+    if (columna && !columna.contains(evento.relatedTarget)) columna.classList.remove('tablero__columna--destino');
+  });
+  tablero.addEventListener('drop', (evento) => {
+    const columna = evento.target.closest('.tablero__columna');
+    if (!columna || !arrastrada || !puedePasar(arrastrada.estado, columna.dataset.estado)) return;
+    evento.preventDefault();
+    columna.classList.remove('tablero__columna--destino');
+    pedirCambioDeEstado(arrastrada.id, columna.dataset.estado);
+  });
+
+  // ------------------------------------------------ Cambio de estado (HU-07)
+  const dialogoEstado = $('#dialogo-estado');
+  const formularioEstado = $('#formulario-estado');
+  const avisoEstado = $('#aviso-estado');
+  const TEXTOS_DE_CAMBIO = {
+    FINALIZADA: {
+      titulo: 'Finalizar la orden',
+      texto: 'La orden pasa a Finalizada y ya no admite más repuestos. El inventario no cambia: cada repuesto se descontó cuando se registró.',
+      boton: 'Finalizar orden',
+      motivoObligatorio: false,
+    },
+    CANCELADA: {
+      titulo: 'Cancelar la orden',
+      texto: 'La orden pasa a Cancelada. Escribe por qué se cancela; queda en el historial.',
+      boton: 'Cancelar orden',
+      motivoObligatorio: true,
+    },
+    EN_PROCESO: {
+      titulo: 'Reabrir la orden',
+      texto: 'La orden vuelve a En proceso y admite repuestos otra vez. Escribe por qué se reabre.',
+      boton: 'Reabrir orden',
+      motivoObligatorio: true,
+    },
+  };
+  let cambioPendiente = null;
+
+  async function pedirCambioDeEstado(id, destino) {
+    let orden;
+    try {
+      orden = await api.pedir(`/api/ordenes/${id}`);
+    } catch (error) {
+      dom.aviso(avisoLista, error.message, 'error');
+      return;
+    }
+    const textos = TEXTOS_DE_CAMBIO[destino];
+    cambioPendiente = { id, destino };
+    formularioEstado.reset();
+    dom.limpiarErrores(formularioEstado);
+    avisoEstado.textContent = '';
+    $('#titulo-cambio-estado').textContent = `${textos.titulo} #${orden.id}`;
+    $('#texto-cambio-estado').textContent = textos.texto;
+    $('#motivo-opcional').hidden = textos.motivoObligatorio;
+    $('#boton-confirmar-estado').textContent = textos.boton;
+
+    const unidades = orden.repuestos.filter((r) => !r.devuelto).reduce((suma, r) => suma + r.cantidad, 0);
+    $('#campo-devolver').hidden = !(destino === 'CANCELADA' && unidades > 0);
+    $('#texto-devolver').textContent = `Devolver al inventario ${unidades === 1 ? 'la unidad registrada' : `las ${unidades} unidades registradas`} en esta orden`;
+
+    dialogoEstado.showModal();
+    $('#estado-motivo').focus();
+  }
+
+  formularioEstado.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    if (!cambioPendiente) return;
+    dom.limpiarErrores(formularioEstado);
+    avisoEstado.textContent = '';
+    const datos = new FormData(formularioEstado);
+    const cuerpo = { estado: cambioPendiente.destino, motivo: datos.get('motivo') };
+    if (cambioPendiente.destino === 'CANCELADA') cuerpo.devolverRepuestos = datos.get('devolverRepuestos') === 'on';
+    try {
+      const orden = await api.enviar(`/api/ordenes/${cambioPendiente.id}/estado`, 'PATCH', cuerpo);
+      dialogoEstado.close();
+      cambioPendiente = null;
+      if (dialogo.open) await abrirDetalle(orden.id);
+      await cargar();
+    } catch (error) {
+      const sinCampo = dom.marcarErrores(formularioEstado, error.detalles || []);
+      dom.aviso(avisoEstado, error.message, 'error', sinCampo);
+    }
+  });
+
+  $('#boton-volver-estado').addEventListener('click', () => dialogoEstado.close());
 
   let temporizador;
   function filtrarPronto() {
@@ -198,9 +437,12 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
       cuerpoUsados.appendChild(fila);
     }
     orden.repuestos.forEach((r) => {
-      const fila = dom.crear('tr');
+      const fila = dom.crear('tr', { clase: r.devuelto ? 'devuelto' : '' });
       const nombre = dom.crear('td', { texto: r.nombre });
-      nombre.appendChild(dom.crear('span', { clase: 'detalle', texto: `${r.sku}, registró ${r.registradoPor}` }));
+      nombre.appendChild(dom.crear('span', {
+        clase: 'detalle',
+        texto: `${r.sku}, registró ${r.registradoPor}${r.devuelto ? '. Devuelto al inventario' : ''}`,
+      }));
       fila.appendChild(nombre);
       fila.appendChild(dom.crear('td', { clase: 'num', texto: r.cantidad }));
       fila.appendChild(dom.crear('td', { clase: 'num', texto: formato.pesos.format(r.costoUnitario) }));
@@ -209,8 +451,25 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
     });
     $('#total-repuestos-orden').textContent = formato.pesos.format(orden.totalRepuestos);
 
-    formularioUsado.hidden = !(puedeCrear() && orden.estado === 'EN_PROCESO');
+    formularioUsado.hidden = !(puedeTrabajar() && orden.estado === 'EN_PROCESO');
+    $('#acciones-estado').replaceChildren(...botonesDeEstado(orden));
     pintarNotas(orden);
+  }
+
+  const ETIQUETA_DE_CAMBIO = { EN_PROCESO: 'Reabierta', FINALIZADA: 'Finalizada', CANCELADA: 'Cancelada' };
+
+  async function cargarHistorialDeEstados(id) {
+    const lista = $('#historial-estados');
+    lista.replaceChildren();
+    const cambios = await api.pedir(`/api/ordenes/${id}/historial`);
+    cambios.forEach((cambio) => {
+      const item = dom.crear('li');
+      const titulo = cambio.estadoAnterior ? ETIQUETA_DE_CAMBIO[cambio.estadoNuevo] : 'Creada';
+      item.appendChild(dom.crear('span', { texto: `${titulo} por ${cambio.usuario}` }));
+      item.appendChild(dom.crear('span', { clase: 'fecha', texto: formato.fechaSqlite(cambio.fecha) }));
+      if (cambio.motivo) item.appendChild(dom.crear('span', { clase: 'motivo', texto: cambio.motivo }));
+      lista.appendChild(item);
+    });
   }
 
   // ------------------------------------------------------------------ Notas
@@ -219,7 +478,7 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
   const avisoNotas = $('#aviso-notas');
 
   function pintarNotas(orden) {
-    const editable = puedeCrear();
+    const editable = puedeTrabajar();
     campoNotas.value = orden.notas || '';
     campoNotas.readOnly = !editable;
     campoNotas.placeholder = editable ? campoNotas.placeholder : 'Sin notas registradas.';
@@ -263,6 +522,7 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
     try {
       const orden = await api.pedir(`/api/ordenes/${id}`);
       pintarDetalle(orden);
+      await cargarHistorialDeEstados(id);
       if (!formularioUsado.hidden) await cargarRepuestosDisponibles();
       if (!dialogo.open) dialogo.showModal();
     } catch (error) {
@@ -273,6 +533,11 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
   cuerpo.addEventListener('click', (evento) => {
     const boton = evento.target.closest('button[data-orden]');
     if (boton) abrirDetalle(Number(boton.dataset.orden));
+  });
+
+  $('#acciones-estado').addEventListener('click', (evento) => {
+    const boton = evento.target.closest('button[data-cambiar]');
+    if (boton) pedirCambioDeEstado(Number(boton.dataset.cambiar), boton.dataset.destino);
   });
 
   formularioUsado.addEventListener('submit', async (evento) => {
@@ -326,6 +591,10 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
       $('#campo-filtro-mecanico').hidden = esMecanico;
       $('#titulo-lista-ordenes').textContent = esMecanico ? 'Mis órdenes' : 'Todas las órdenes';
       if (!esMecanico) await cargarMecanicos().catch(() => {});
+      // El mecánico trabaja sobre el tablero; los demás roles arrancan en la lista.
+      let guardado = null;
+      try { guardado = window.sessionStorage.getItem(CLAVE_MODO); } catch { /* almacenamiento no disponible */ }
+      aplicarModo(guardado || (esMecanico ? 'tablero' : 'lista'));
       pagina = 1;
       await cargar();
     },

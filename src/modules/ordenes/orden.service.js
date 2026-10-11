@@ -1,7 +1,8 @@
 const { validarNuevaOrden } = require('./orden.validator');
 const { validarRepuestosUsados } = require('./repuestos-usados.validator');
 const { validarFiltros } = require('./filtros.validator');
-const { ESTADOS } = require('./estados');
+const { validarCambioDeEstado } = require('./estado.validator');
+const { ESTADOS, NOMBRE_ESTADO, evaluarTransicion } = require('./estados');
 const { ROLES } = require('../auth/roles');
 const { ErrorDeValidacion, NoEncontrado, SinPermiso, Conflicto } = require('../../shared/errors');
 
@@ -54,17 +55,21 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos) {
           creadoPor: usuario.id,
           descripcion,
         });
+        repositorio.registrarCambioDeEstado({ ordenId: id, estadoNuevo: ESTADOS.EN_PROCESO, usuarioId: usuario.id });
         return repositorio.buscarPorId(id);
       });
     },
 
-    /** Detalle completo: datos de la orden más los repuestos usados y su total. */
+    /**
+     * Detalle completo: datos de la orden más los repuestos usados y su total.
+     * Los repuestos devueltos al cancelar siguen en la lista, pero no suman.
+     */
     obtener(id, usuario) {
       const orden = repositorio.buscarPorId(id);
       if (!orden) throw new NoEncontrado(`No existe la orden #${id}`);
       verificarAcceso(orden, usuario);
       const usados = repositorio.listarRepuestosDeOrden(id);
-      const total = usados.reduce((suma, r) => suma + r.subtotal, 0);
+      const total = usados.reduce((suma, r) => suma + (r.devuelto ? 0 : r.subtotal), 0);
       return { ...orden, repuestos: usados, totalRepuestos: Math.round(total * 100) / 100 };
     },
 
@@ -140,6 +145,68 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos) {
       }
       repositorio.actualizarNotas(id, limpias === '' ? null : limpias, usuario.id);
       return this.obtener(id, usuario);
+    },
+
+    /**
+     * HU-07: cambia el estado de la orden y deja el cambio en su historial.
+     *
+     * Finalizar NO vuelve a descontar stock: ya se descontó al registrar cada
+     * repuesto (HU-04). Cancelar devuelve al inventario los repuestos de la
+     * orden, salvo que se indique que ya se instalaron (devolverRepuestos: false).
+     */
+    cambiarEstado(id, entrada, usuario) {
+      const orden = this.obtener(id, usuario);
+
+      const resultado = validarCambioDeEstado(entrada);
+      if (!resultado.valido) throw new ErrorDeValidacion(resultado.errores);
+      const { estado, motivo, devolverRepuestos } = resultado.valor;
+
+      const { permitida, razon } = evaluarTransicion(orden.estado, estado, usuario.rol);
+      if (razon === 'ROL_SIN_PERMISO') {
+        throw new SinPermiso('Solo el dueño o el administrador pueden reabrir una orden cerrada');
+      }
+      if (!permitida) {
+        const detalle = razon === 'MISMO_ESTADO'
+          ? `La orden #${id} ya está ${orden.estadoNombre.toLowerCase()}`
+          : `La orden #${id} está ${orden.estadoNombre.toLowerCase()} y no puede pasar a ${NOMBRE_ESTADO[estado].toLowerCase()}`;
+        throw new Conflicto(detalle);
+      }
+
+      repositorio.enTransaccion(() => {
+        if (!repositorio.cambiarEstado(id, orden.estado, estado)) {
+          throw new Conflicto(`Otra persona cambió la orden #${id} al mismo tiempo; vuelve a abrirla`);
+        }
+        repositorio.registrarCambioDeEstado({
+          ordenId: id,
+          estadoAnterior: orden.estado,
+          estadoNuevo: estado,
+          usuarioId: usuario.id,
+          motivo,
+        });
+
+        if (estado === ESTADOS.CANCELADA && devolverRepuestos) {
+          orden.repuestos.filter((r) => !r.devuelto).forEach((r) => {
+            const stockResultante = repuestos.sumarStock(r.repuestoId, r.cantidad);
+            repuestos.registrarMovimiento({
+              repuestoId: r.repuestoId,
+              tipo: 'DEVOLUCION',
+              cantidad: r.cantidad,
+              stockResultante,
+              detalle: `Devuelto al cancelar la orden #${id} (${orden.vehiculo.placa})`,
+              ordenId: id,
+            });
+          });
+          repositorio.marcarRepuestosDevueltos(id);
+        }
+      });
+
+      return this.obtener(id, usuario);
+    },
+
+    /** Historial de cambios de estado de la orden, del más antiguo al más reciente. */
+    historialDeEstados(id, usuario) {
+      this.obtener(id, usuario);
+      return repositorio.listarHistorialDeEstados(id);
     },
 
     /**

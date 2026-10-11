@@ -26,6 +26,8 @@ window.Taller.vistas.inventario = (function crearVistaInventario() {
     BAJA: 'Dado de baja',
     CARGA_CSV: 'Carga por CSV',
     USO_EN_ORDEN: 'Usado en orden',
+    DEVOLUCION: 'Devuelto por orden cancelada',
+    ENTRADA: 'Entrada de mercancía',
   };
 
   let repuestosVisibles = [];

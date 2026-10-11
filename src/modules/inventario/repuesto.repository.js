@@ -55,6 +55,13 @@ function crearRepositorioRepuestos(db) {
          SET stock_actual = stock_actual - @cantidad, actualizado_en = datetime('now')
        WHERE id = @id AND activo = 1 AND stock_actual >= @cantidad
     `),
+    // Sin filtrar por "activo": si el repuesto se dio de baja, la pieza igual vuelve al estante.
+    sumar: db.prepare(`
+      UPDATE repuestos
+         SET stock_actual = stock_actual + @cantidad, actualizado_en = datetime('now')
+       WHERE id = @id
+      RETURNING stock_actual
+    `),
     movimientosDe: db.prepare(`
       SELECT id, tipo, cantidad, stock_resultante AS "stockResultante", detalle, orden_id AS "ordenId", fecha
         FROM movimientos_inventario
@@ -101,6 +108,14 @@ function crearRepositorioRepuestos(db) {
      */
     descontarStock(id, cantidad) {
       return sentencias.descontar.run({ id, cantidad }).changes > 0;
+    },
+    /**
+     * Suma unidades al stock (devoluciones y entradas de mercancía).
+     * @returns {number|null} El stock resultante, o null si el repuesto no existe.
+     */
+    sumarStock(id, cantidad) {
+      const fila = sentencias.sumar.get({ id, cantidad });
+      return fila ? fila.stock_actual : null;
     },
     listarMovimientos(repuestoId) {
       return sentencias.movimientosDe.all(repuestoId).map((fila) => ({ ...fila }));

@@ -74,6 +74,39 @@ describe('Migraciones del esquema (integración con archivos reales)', () => {
     db.close();
   });
 
+  test('una base con órdenes de la versión 6 recibe el historial de estados y conserva los movimientos de sus órdenes', () => {
+    const ruta = path.join(carpeta, 'sprint2.db');
+    crearBaseEnVersion(ruta, 6, (db) => {
+      db.exec(`
+        INSERT INTO usuarios (usuario, nombre, rol, password_hash) VALUES ('andres', 'Andrés Gómez', 'mecanico', 'x');
+        INSERT INTO clientes (documento, nombre, telefono) VALUES ('1037000101', 'Camila Ortiz', '3001112233');
+        INSERT INTO vehiculos (placa, marca, modelo, cliente_id) VALUES ('ABC123', 'Chevrolet', 'Spark GT', 1);
+        INSERT INTO ordenes (cliente_id, vehiculo_id, mecanico_id, creado_por, descripcion, estado, creado_en, actualizado_en)
+          VALUES (1, 1, 1, 1, 'Cambio de aceite', 'FINALIZADA', '2026-09-01 14:00:00', '2026-09-02 10:30:00'),
+                 (1, 1, 1, 1, 'Ruido al frenar', 'EN_PROCESO', '2026-09-05 09:00:00', '2026-09-05 09:00:00');
+        INSERT INTO repuestos (sku, nombre, costo, stock_actual) VALUES ('FIL-1', 'Filtro', 28500, 8);
+        INSERT INTO detalle_repuestos (orden_id, repuesto_id, cantidad, costo_unitario, registrado_por) VALUES (1, 1, 2, 28500, 1);
+        INSERT INTO movimientos_inventario (repuesto_id, tipo, cantidad, stock_resultante, orden_id) VALUES (1, 'USO_EN_ORDEN', -2, 8, 1);
+      `);
+    });
+
+    const db = crearConexion(ruta);
+
+    expect(version(db)).toBe(ULTIMA_VERSION);
+    expect(db.prepare('SELECT orden_id, estado_anterior, estado_nuevo, fecha FROM historial_estados_orden ORDER BY orden_id, id').all()).toEqual([
+      { orden_id: 1, estado_anterior: null, estado_nuevo: 'EN_PROCESO', fecha: '2026-09-01 14:00:00' },
+      { orden_id: 1, estado_anterior: 'EN_PROCESO', estado_nuevo: 'FINALIZADA', fecha: '2026-09-02 10:30:00' },
+      { orden_id: 2, estado_anterior: null, estado_nuevo: 'EN_PROCESO', fecha: '2026-09-05 09:00:00' },
+    ]);
+    expect(db.prepare('SELECT tipo, cantidad, orden_id FROM movimientos_inventario').all()).toEqual([
+      { tipo: 'USO_EN_ORDEN', cantidad: -2, orden_id: 1 },
+    ]);
+    expect(db.prepare('SELECT devuelto FROM detalle_repuestos').get().devuelto).toBe(0);
+    // Los tipos nuevos ya se aceptan en el historial de movimientos.
+    expect(() => db.prepare("INSERT INTO movimientos_inventario (repuesto_id, tipo, cantidad, stock_resultante) VALUES (1, 'DEVOLUCION', 2, 10)").run()).not.toThrow();
+    db.close();
+  });
+
   test('si una migración falla, se deshace completa y la versión no avanza', () => {
     const ruta = path.join(carpeta, 'rota.db');
     // La migración 004 crea esta tabla: si ya existe, falla a mitad de camino.

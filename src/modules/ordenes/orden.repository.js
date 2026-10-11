@@ -75,7 +75,8 @@ function crearRepositorioOrdenes(db) {
       VALUES (@ordenId, @repuestoId, @cantidad, @costoUnitario, @registradoPor)
     `),
     repuestosDeOrden: db.prepare(`
-      SELECT d.id, d.repuesto_id, r.sku, r.nombre, d.cantidad, d.costo_unitario, d.creado_en, u.nombre AS registrado_por
+      SELECT d.id, d.repuesto_id, r.sku, r.nombre, d.cantidad, d.costo_unitario, d.devuelto, d.creado_en,
+             u.nombre AS registrado_por
         FROM detalle_repuestos d
         JOIN repuestos r ON r.id = d.repuesto_id
         JOIN usuarios  u ON u.id = d.registrado_por
@@ -89,6 +90,23 @@ function crearRepositorioOrdenes(db) {
              actualizado_en = datetime('now')
        WHERE id = @id
     `),
+    // La condición sobre el estado actual evita que dos personas cambien la
+    // misma orden a la vez: solo el primero encuentra la fila.
+    cambiarEstado: db.prepare(`
+      UPDATE ordenes SET estado = @estado, actualizado_en = datetime('now') WHERE id = @id AND estado = @estadoActual
+    `),
+    insertarHistorial: db.prepare(`
+      INSERT INTO historial_estados_orden (orden_id, estado_anterior, estado_nuevo, usuario_id, motivo)
+      VALUES (@ordenId, @estadoAnterior, @estadoNuevo, @usuarioId, @motivo)
+    `),
+    historialDeEstados: db.prepare(`
+      SELECT h.id, h.estado_anterior, h.estado_nuevo, h.motivo, h.fecha, u.nombre AS usuario
+        FROM historial_estados_orden h
+        JOIN usuarios u ON u.id = h.usuario_id
+       WHERE h.orden_id = ?
+       ORDER BY h.id
+    `),
+    marcarDevueltos: db.prepare('UPDATE detalle_repuestos SET devuelto = 1 WHERE orden_id = ? AND devuelto = 0'),
   };
 
   return {
@@ -188,9 +206,32 @@ function crearRepositorioOrdenes(db) {
         cantidad: fila.cantidad,
         costoUnitario: fila.costo_unitario,
         subtotal: Math.round(fila.cantidad * fila.costo_unitario * 100) / 100,
+        devuelto: fila.devuelto === 1,
         registradoPor: fila.registrado_por,
         creadoEn: fila.creado_en,
       }));
+    },
+    /** @returns {boolean} false si la orden ya no estaba en el estado esperado. */
+    cambiarEstado(id, estadoActual, estado) {
+      return sentencias.cambiarEstado.run({ id, estadoActual, estado }).changes > 0;
+    },
+    registrarCambioDeEstado({ ordenId, estadoAnterior = null, estadoNuevo, usuarioId, motivo = null }) {
+      sentencias.insertarHistorial.run({ ordenId, estadoAnterior, estadoNuevo, usuarioId, motivo });
+    },
+    listarHistorialDeEstados(ordenId) {
+      return sentencias.historialDeEstados.all(ordenId).map((fila) => ({
+        id: fila.id,
+        estadoAnterior: fila.estado_anterior,
+        estadoAnteriorNombre: fila.estado_anterior ? NOMBRE_ESTADO[fila.estado_anterior] : null,
+        estadoNuevo: fila.estado_nuevo,
+        estadoNuevoNombre: NOMBRE_ESTADO[fila.estado_nuevo],
+        motivo: fila.motivo,
+        usuario: fila.usuario,
+        fecha: fila.fecha,
+      }));
+    },
+    marcarRepuestosDevueltos(ordenId) {
+      sentencias.marcarDevueltos.run(ordenId);
     },
     enTransaccion(fn) {
       db.exec('BEGIN');

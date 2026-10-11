@@ -129,6 +129,10 @@
           <div class="barra">
             <h2 id="titulo-lista-ordenes">Órdenes</h2>
             <p class="detalle" id="info-resultados" aria-live="polite"></p>
+            <div class="alternador" role="group" aria-label="Forma de ver las órdenes">
+              <button type="button" class="alternador__opcion" data-modo="tablero" aria-pressed="false">Tablero</button>
+              <button type="button" class="alternador__opcion" data-modo="lista" aria-pressed="true">Lista</button>
+            </div>
           </div>
           <form class="filtros" id="filtros-ordenes" role="search" aria-label="Filtrar órdenes">
             <div class="campo">
@@ -145,7 +149,7 @@
                 <option value="">Todos</option>
               </select>
             </div>
-            <div class="campo">
+            <div class="campo" id="campo-filtro-estado">
               <label for="filtro-estado">Estado</label>
               <select id="filtro-estado" name="estado">
                 <option value="">Todos</option>
@@ -158,6 +162,24 @@
             <button type="reset" class="boton boton--texto">Limpiar filtros</button>
           </form>
           <p class="aviso" id="aviso-lista-ordenes" role="status"></p>
+
+          <!-- Tablero Kanban (HU-07): una columna por estado -->
+          <div class="tablero" id="tablero-ordenes" hidden>
+            <section class="tablero__columna" data-estado="EN_PROCESO" aria-labelledby="columna-en-proceso">
+              <h3 id="columna-en-proceso">En proceso <span class="tablero__conteo" data-conteo="EN_PROCESO"></span></h3>
+              <ul class="tablero__tarjetas" data-tarjetas="EN_PROCESO"></ul>
+            </section>
+            <section class="tablero__columna" data-estado="FINALIZADA" aria-labelledby="columna-finalizada">
+              <h3 id="columna-finalizada">Finalizadas <span class="tablero__conteo" data-conteo="FINALIZADA"></span></h3>
+              <ul class="tablero__tarjetas" data-tarjetas="FINALIZADA"></ul>
+            </section>
+            <section class="tablero__columna" data-estado="CANCELADA" aria-labelledby="columna-cancelada">
+              <h3 id="columna-cancelada">Canceladas <span class="tablero__conteo" data-conteo="CANCELADA"></span></h3>
+              <ul class="tablero__tarjetas" data-tarjetas="CANCELADA"></ul>
+            </section>
+          </div>
+
+          <div id="lista-ordenes">
           <div class="tabla-contenedor">
             <table class="tabla-ordenes">
               <thead>
@@ -179,6 +201,7 @@
             <span id="pagina-actual"></span>
             <button type="button" class="boton boton--secundario boton--chico" id="pagina-siguiente">Siguiente</button>
           </nav>
+          </div>
         </section>
       </div>
     </section>
@@ -287,6 +310,12 @@
     <dl class="ficha" id="ficha-orden"></dl>
     <p class="problema" id="problema-orden"></p>
 
+    <section class="bloque-orden" aria-labelledby="titulo-estado-orden">
+      <h3 id="titulo-estado-orden">Estado de la orden</h3>
+      <div class="acciones" id="acciones-estado"></div>
+      <ol class="historial historial--estados" id="historial-estados"></ol>
+    </section>
+
     <section class="bloque-orden" aria-labelledby="titulo-notas-orden">
       <h3 id="titulo-notas-orden">Notas de la reparación</h3>
       <form id="formulario-notas" novalidate>
@@ -336,6 +365,27 @@
       </form>
       <p class="aviso" id="aviso-repuesto-usado" role="status"></p>
     </section>
+  </dialog>
+
+  <dialog id="dialogo-estado" aria-labelledby="titulo-cambio-estado">
+    <form id="formulario-estado" novalidate>
+      <h2 id="titulo-cambio-estado">Cambiar estado</h2>
+      <p id="texto-cambio-estado"></p>
+      <div class="campo">
+        <label for="estado-motivo">Motivo <span class="opcional" id="motivo-opcional">(opcional)</span></label>
+        <textarea id="estado-motivo" name="motivo" rows="3" maxlength="500"></textarea>
+        <p class="campo__error" data-error="motivo"></p>
+      </div>
+      <label class="interruptor" id="campo-devolver" hidden>
+        <input type="checkbox" name="devolverRepuestos" checked>
+        <span id="texto-devolver">Devolver al inventario los repuestos registrados</span>
+      </label>
+      <p class="aviso" id="aviso-estado" role="alert"></p>
+      <div class="acciones">
+        <button type="submit" class="boton" id="boton-confirmar-estado">Confirmar</button>
+        <button type="button" class="boton boton--texto" id="boton-volver-estado">Volver</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="dialogo-historial" aria-labelledby="titulo-historial">

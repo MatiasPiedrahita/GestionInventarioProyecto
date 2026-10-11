@@ -75,15 +75,15 @@ const repoOrdenes = crearRepositorioOrdenes(db);
 const ordenes = crearServicioOrdenes(repoOrdenes, repoUsuarios, repoRepuestos);
 let ordenesNuevas = 0;
 if (db.prepare('SELECT COUNT(*) AS n FROM ordenes').get().n === 0) {
-  ORDENES_DE_EJEMPLO.forEach(([documento, nombre, telefono, placa, marca, modelo, descripcion, mecanico]) => {
+  const creadas = ORDENES_DE_EJEMPLO.map(([documento, nombre, telefono, placa, marca, modelo, descripcion, mecanico]) => {
     const autor = repoUsuarios.buscarPorUsuario(mecanico);
-    ordenes.crear({ cliente: { documento, nombre, telefono }, vehiculo: { placa, marca, modelo }, descripcion }, autor);
     ordenesNuevas += 1;
+    return ordenes.crear({ cliente: { documento, nombre, telefono }, vehiculo: { placa, marca, modelo }, descripcion }, autor).id;
   });
-  // Algunas quedan como históricas para poder probar los filtros. El cambio
-  // de estado desde la aplicación llega con la HU "Actualización del estado".
-  db.exec("UPDATE ordenes SET estado = 'FINALIZADA' WHERE id IN (1, 2, 4, 7)");
-  db.exec("UPDATE ordenes SET estado = 'CANCELADA' WHERE id = 3");
+  // Algunas quedan como históricas para poder probar los filtros y el tablero.
+  const dueno = repoUsuarios.buscarPorUsuario('dueno');
+  [0, 1, 3, 6].forEach((i) => ordenes.cambiarEstado(creadas[i], { estado: 'FINALIZADA' }, dueno));
+  ordenes.cambiarEstado(creadas[2], { estado: 'CANCELADA', motivo: 'El cliente decidió no hacer la reparación' }, dueno);
 }
 
 console.log(`Seed completo en ${RUTA_DB}`);

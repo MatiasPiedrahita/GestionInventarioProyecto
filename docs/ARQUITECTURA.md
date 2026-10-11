@@ -1,10 +1,10 @@
 # Arquitectura y decisiones técnicas
 
-Este documento explica **por qué** el código está organizado así. Los diagramas del proyecto (clases, secuencia, componentes y despliegue, C4 nivel 1 y 2) describen el sistema completo. Aquí solo se documenta lo que existe en este incremento (HU-01).
+Este documento explica **por qué** el código está organizado así. Los diagramas del proyecto (clases, secuencia, componentes y despliegue, C4 nivel 1 y 2) describen el sistema completo. Aquí solo se documenta lo que existe en el código.
 
 ## Relación con los diagramas
 
-| Diagrama | Qué está implementado (Sprint 1 y mitad del Sprint 2) |
+| Diagrama | Qué está implementado (Sprints 1 y 2) |
 |---|---|
 | Clases | `Usuario` con rol, `Repuesto`, `MovimientoInventario`, `Cliente`, `Vehiculo`, `OrdenTrabajo` y `DetalleRepuesto` (composición con la orden) |
 | Componentes | Interfaz de usuario → API REST → módulos **Auth**, **Inventario** y **Órdenes** → Base de datos |
@@ -55,7 +55,7 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 ### ADR-07 · Migraciones versionadas del esquema
 
 - **Contexto:** cada historia agrega tablas. Los integrantes ya tenían una base local con datos del primer incremento, y no se podía pedir que la borraran.
-- **Decisión:** el esquema vive en archivos numerados (`src/db/migraciones/001_…sql` a `006_…sql`). La versión aplicada se guarda en `PRAGMA user_version`; al abrir la base solo se ejecutan las migraciones pendientes, cada una dentro de una transacción.
+- **Decisión:** el esquema vive en archivos numerados (`src/db/migraciones/001_…sql` en adelante). La versión aplicada se guarda en `PRAGMA user_version`; al abrir la base solo se ejecutan las migraciones pendientes, cada una dentro de una transacción.
 - **Consecuencia:** la migración 004 tuvo que **reconstruir** la tabla de movimientos (SQLite no permite cambiar un `CHECK`), copiando todo el historial. Se probó sobre una base con datos de la versión anterior.
 
 ### ADR-08 · Sesiones en base de datos en lugar de JWT
@@ -76,7 +76,7 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 - **Decisión:** el stock se descuenta en el momento en que el mecánico registra el repuesto en la orden (HU-04), no al finalizarla.
 - **Motivo:** así el inventario refleja de inmediato lo que salió del estante y otro mecánico no puede usar las mismas piezas.
 - **Control de concurrencia:** el `UPDATE` incluye la condición `stock_actual >= cantidad`, así dos registros simultáneos nunca dejan el stock negativo.
-- **Pendiente para la HU "Actualización del estado":** su criterio menciona descontar al finalizar. Como el stock ya se descuenta al registrar, esa historia solo deberá cambiar el estado, sin volver a descontar.
+- **Efecto en la HU-07:** su criterio menciona descontar al finalizar. Como el stock ya se descuenta al registrar, finalizar solo cambia el estado (ver ADR-12).
 
 ### ADR-11 · Listado paginado con filtros parametrizados e índices
 
@@ -85,6 +85,23 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 - Hay índices compuestos `(estado, id)` y `(mecanico_id, id)`, que permiten filtrar y ordenar sin recorrer la tabla. Una prueba automática lo verifica con `EXPLAIN QUERY PLAN`.
 - La búsqueda por **nombre de cliente** es parcial (`LIKE '%texto%'`) y no aprovecha índices. Con el volumen de un taller es suficiente; si creciera, el paso natural sería una búsqueda de texto completo (FTS5).
 
+### ADR-12 · Cambio de estado: finalizar no descuenta, cancelar devuelve
+
+- **Contexto:** el criterio de la HU-07 dice "descontar el stock al finalizar la orden". Eso choca con el ADR-10: el stock ya salió cuando el mecánico registró el repuesto. Descontar otra vez al finalizar duplicaría el consumo.
+- **Decisión:** finalizar **solo cambia el estado**. La prueba de aceptación traduce el criterio así: una orden con 2 filtros consumidos, al finalizarla, deja en la base exactamente 2 unidades descontadas.
+- **Cancelar devuelve los repuestos:** si la reparación no se hizo, las piezas vuelven al estante. Se registra un movimiento `DEVOLUCION` por repuesto y el detalle queda marcado como devuelto (no se borra). Si la pieza ya se instaló, quien cancela desmarca la devolución (`devolverRepuestos: false`).
+- **Por qué importa para el Sprint 3:** el modelo de predicción calcula la demanda como `USO_EN_ORDEN − DEVOLUCION`. Sin la devolución, una orden cancelada contaría como consumo real.
+- **Transiciones permitidas:** `En proceso → Finalizada | Cancelada`, y `Finalizada | Cancelada → En proceso` (reabrir). Reabrir es solo para dueño y administrador, y exige motivo, igual que cancelar. Las reglas viven en una función pura (`estados.js`) con sus pruebas unitarias.
+- **Historial:** cada cambio queda en `historial_estados_orden` (quién, cuándo, motivo). Las órdenes que ya existían recibieron su historial en la migración 007.
+- **Concurrencia:** el `UPDATE` del estado incluye el estado que se leyó (`WHERE estado = @estadoActual`). Si dos personas cambian la misma orden a la vez, la segunda recibe un 409 y no se devuelve stock dos veces.
+
+### ADR-13 · Pruebas de interfaz con jsdom contra la API real
+
+- **Contexto:** la interfaz no tenía pruebas automatizadas; un error en el tablero solo se veía probando a mano.
+- **Decisión:** `tests/helpers/navegador.js` carga `public/index.html` y sus scripts en jsdom y dirige cada `fetch` a la aplicación Express de la prueba (con Supertest). Así una prueba hace clic en "Finalizar" y verifica el resultado en la pantalla **y** en la base de datos.
+- **Alternativa descartada:** un navegador real (Playwright). Es más fiel, pero descarga navegadores en cada ejecución del pipeline y hace las pruebas lentas para lo que se quiere comprobar.
+- **Límite conocido:** jsdom no dibuja ni aplica CSS; no detecta problemas visuales. Se fijó en la versión 26 porque las posteriores usan módulos que Jest no carga en Node 22.
+
 ## Requisitos no funcionales cubiertos
 
 | RNF | Cómo se atiende |
@@ -92,6 +109,6 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 | Facilidad de uso | Una sola pantalla, mensajes de error junto a cada campo y textos en lenguaje del taller |
 | Velocidad (< 2 s) | Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
-| Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, 163 pruebas y CI |
+| Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, más de 200 pruebas (unitarias, integración, aceptación e interfaz) y CI |
 | Crecimiento a futuro | Módulos por dominio (`auth`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
 | Seguridad | Login con contraseñas cifradas, sesiones con vencimiento, permisos por rol y por propiedad en la API, consultas parametrizadas y ningún secreto en el repositorio |
