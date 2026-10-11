@@ -4,6 +4,7 @@ const { ErrorDeDominio } = require('./errors');
 // eslint-disable-next-line no-unused-vars
 function manejadorDeErrores(error, req, res, next) {
   if (error instanceof ErrorDeDominio) {
+    if (error.reintentarEnSegundos) res.set('Retry-After', String(error.reintentarEnSegundos));
     return res.status(error.status).json({
       error: error.codigo,
       mensaje: error.message,

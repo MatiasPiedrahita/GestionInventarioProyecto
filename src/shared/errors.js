@@ -42,4 +42,32 @@ class Conflicto extends ErrorDeDominio {
   }
 }
 
-module.exports = { ErrorDeDominio, ErrorDeValidacion, NoAutenticado, SinPermiso, NoEncontrado, Conflicto };
+/** El usuario entró con una contraseña temporal: debe cambiarla antes de seguir. */
+class CambioDePasswordRequerido extends ErrorDeDominio {
+  constructor(mensaje = 'Debes cambiar tu contraseña temporal antes de continuar') {
+    super(mensaje, { status: 403, codigo: 'CAMBIO_DE_PASSWORD_REQUERIDO' });
+  }
+}
+
+class DemasiadosIntentos extends ErrorDeDominio {
+  /** @param {number} segundos Cuánto falta para poder reintentar (va en la cabecera Retry-After). */
+  constructor(segundos) {
+    const minutos = Math.max(1, Math.ceil(segundos / 60));
+    super(`Demasiados intentos fallidos. Intenta de nuevo en ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`, {
+      status: 429,
+      codigo: 'DEMASIADOS_INTENTOS',
+    });
+    this.reintentarEnSegundos = segundos;
+  }
+}
+
+module.exports = {
+  ErrorDeDominio,
+  ErrorDeValidacion,
+  NoAutenticado,
+  SinPermiso,
+  NoEncontrado,
+  Conflicto,
+  CambioDePasswordRequerido,
+  DemasiadosIntentos,
+};
