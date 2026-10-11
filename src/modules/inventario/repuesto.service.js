@@ -152,6 +152,28 @@ function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA, event
       return actualizado;
     },
 
+    /** Cambia solo el stock mínimo (por ejemplo, para aplicar el que sugiere la predicción). */
+    cambiarStockMinimo(id, minimo, usuario) {
+      const repuesto = exigirExistente(id);
+      if (!Number.isInteger(minimo) || minimo < 0) {
+        throw new ErrorDeValidacion([{ campo: 'stockMinimo', mensaje: 'El stock mínimo debe ser un número entero y no puede ser negativo' }]);
+      }
+      if (minimo !== repuesto.stockMinimo) {
+        repositorio.enTransaccion(() => {
+          repositorio.cambiarMinimo(id, minimo);
+          auditoria.registrar({
+            usuarioId: idDe(usuario),
+            accion: ACCIONES.REPUESTO_MINIMO,
+            entidad: 'repuesto',
+            entidadId: id,
+            detalle: `${repuesto.sku}: stock mínimo de ${repuesto.stockMinimo} a ${minimo}`,
+          });
+        });
+        eventos.stockCambiado([id]);
+      }
+      return repositorio.buscarPorId(id);
+    },
+
     historial(id) {
       exigirExistente(id);
       return repositorio.listarMovimientos(id);

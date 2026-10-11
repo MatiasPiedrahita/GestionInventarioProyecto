@@ -15,9 +15,13 @@ const ETIQUETAS = {
   costo: 'El costo',
   stockActual: 'El stock actual',
   stockMinimo: 'El stock mínimo',
+  diasReposicion: 'Los días de reposición',
   proveedor: 'El proveedor',
   ubicacion: 'La ubicación',
 };
+
+const DIAS_DE_REPOSICION_POR_DEFECTO = 7;
+const DIAS_DE_REPOSICION_MAXIMOS = 180;
 
 const LIMITES = {
   sku: 40,
@@ -114,6 +118,15 @@ function validarRepuesto(entrada) {
     porDefecto: 0,
   });
 
+  // Cuántos días tarda en llegar un pedido: lo usa la predicción para saber si el stock alcanza.
+  const diasReposicion = validarEnteroNoNegativo(errores, 'diasReposicion', entrada.diasReposicion, {
+    obligatorio: false,
+    porDefecto: DIAS_DE_REPOSICION_POR_DEFECTO,
+  });
+  if (diasReposicion !== null && (diasReposicion < 1 || diasReposicion > DIAS_DE_REPOSICION_MAXIMOS)) {
+    errores.push({ campo: 'diasReposicion', mensaje: `Los días de reposición deben estar entre 1 y ${DIAS_DE_REPOSICION_MAXIMOS}` });
+  }
+
   const proveedor = validarTexto(errores, 'proveedor', entrada.proveedor, { obligatorio: false });
   const ubicacion = validarTexto(errores, 'ubicacion', entrada.ubicacion, { obligatorio: false });
 
@@ -130,6 +143,7 @@ function validarRepuesto(entrada) {
       costo: Math.round(costo * 100) / 100,
       stockActual,
       stockMinimo,
+      diasReposicion,
       proveedor,
       ubicacion,
     },

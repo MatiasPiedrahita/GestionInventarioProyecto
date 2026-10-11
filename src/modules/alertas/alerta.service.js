@@ -25,9 +25,17 @@ function leerNota(entrada, campo) {
  * mismo tipo ni recibe dos veces el mismo aviso.
  *
  * @param {object} repositorio Repositorio de alertas.
- * @param {{ notificaciones: object, destinatarios: () => object[], auditoria?: object, urlDeLaAplicacion?: string }} dependencias
+ * @param {{ notificaciones: object, destinatarios: () => object[], auditoria?: object, urlDeLaAplicacion?: string,
+ *           sugerencias?: () => Map<number, object> }} dependencias
+ *        sugerencias devuelve, por repuesto, lo que recomienda la última predicción de demanda (cuánto pedir, cuándo se agota).
  */
-function crearServicioAlertas(repositorio, { notificaciones, destinatarios, auditoria = SIN_AUDITORIA, urlDeLaAplicacion = null }) {
+function crearServicioAlertas(repositorio, {
+  notificaciones,
+  destinatarios,
+  auditoria = SIN_AUDITORIA,
+  urlDeLaAplicacion = null,
+  sugerencias = () => new Map(),
+}) {
   /** Avisa (campana y correo) de las alertas nuevas o que empeoraron, en un solo correo por persona. */
   function avisar(ids) {
     const alertas = ids.map((id) => repositorio.buscarPorId(id));
@@ -108,6 +116,48 @@ function crearServicioAlertas(repositorio, { notificaciones, destinatarios, audi
       }
     },
 
+    /**
+     * Integración con la predicción de demanda. Recibe los repuestos que,
+     * según el modelo, se agotarían antes de que alcance a llegar un pedido,
+     * aunque hoy estén por encima de su mínimo. Abre esas alertas, actualiza
+     * las que ya existían y resuelve las que el modelo ya no proyecta.
+     *
+     * @param {{ repuestoId: number, detalle: string }[]} proyectados
+     */
+    sincronizarProyectadas(proyectados) {
+      const porRepuesto = new Map(proyectados.map((p) => [p.repuestoId, p]));
+      const nuevas = [];
+      let resueltas = 0;
+
+      repositorio.enTransaccion(() => {
+        repositorio.listarRepuestos().forEach((repuesto) => {
+          const abiertas = repositorio.listarAbiertasDe(repuesto.id);
+          const proyectada = abiertas.find((a) => a.tipo === TIPOS.QUIEBRE_PROYECTADO);
+          // Si el stock ya está en el mínimo, manda la alerta real: la proyección sobra.
+          const yaEsReal = abiertas.some((a) => TIPOS_DE_NIVEL.includes(a.tipo));
+          const pedida = repuesto.activo && !yaEsReal ? porRepuesto.get(repuesto.id) : null;
+
+          if (pedida && !proyectada) {
+            nuevas.push(repositorio.insertar({
+              repuestoId: repuesto.id,
+              tipo: TIPOS.QUIEBRE_PROYECTADO,
+              stockAlGenerar: repuesto.stockActual,
+              stockMinimo: repuesto.stockMinimo,
+              detalle: pedida.detalle,
+            }));
+          } else if (pedida && proyectada) {
+            repositorio.cambiarDetalle(proyectada.id, pedida.detalle);
+          } else if (!pedida && proyectada) {
+            repositorio.resolver(proyectada.id);
+            resueltas += 1;
+          }
+        });
+      });
+
+      avisar(nuevas);
+      return { creadas: nuevas.length, resueltas };
+    },
+
     /** El mecánico avisa que un repuesto falta o no alcanza para un trabajo, aunque el sistema diga que hay. */
     reportarFaltante(repuestoId, entrada, usuario) {
       const repuesto = repositorio.buscarRepuesto(repuestoId);
@@ -155,7 +205,9 @@ function crearServicioAlertas(repositorio, { notificaciones, destinatarios, audi
       }
       const conteo = repositorio.contar();
       if (grupo === 'ABIERTAS') {
-        const datos = repositorio.listarAbiertas();
+        // A cada alerta abierta se le suma lo que recomienda la predicción: cuánto pedir y cuándo se agota.
+        const recomendado = sugerencias();
+        const datos = repositorio.listarAbiertas().map((alerta) => ({ ...alerta, prediccion: recomendado.get(alerta.repuesto.id) || null }));
         return { estado: grupo, datos, pagina: 1, totalPaginas: 1, total: datos.length, conteo };
       }
       const pedida = Number(query.pagina);

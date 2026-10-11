@@ -22,6 +22,7 @@ describe('validarRepuesto (unitarias)', () => {
       costo: 28500,
       stockActual: 14,
       stockMinimo: 5,
+      diasReposicion: 7,
       proveedor: 'Autopartes del Valle',
       ubicacion: 'Estante A1',
     });

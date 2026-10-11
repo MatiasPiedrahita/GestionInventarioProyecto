@@ -12,6 +12,7 @@ function aDominio(fila) {
     costo: fila.costo,
     stockActual: fila.stock_actual,
     stockMinimo: fila.stock_minimo,
+    diasReposicion: fila.dias_reposicion,
     proveedor: fila.proveedor,
     ubicacion: fila.ubicacion,
     activo: fila.activo === 1,
@@ -24,15 +25,18 @@ function aDominio(fila) {
 function crearRepositorioRepuestos(db) {
   const sentencias = {
     insertar: db.prepare(`
-      INSERT INTO repuestos (sku, nombre, costo, stock_actual, stock_minimo, proveedor, ubicacion)
-      VALUES (@sku, @nombre, @costo, @stockActual, @stockMinimo, @proveedor, @ubicacion)
+      INSERT INTO repuestos (sku, nombre, costo, stock_actual, stock_minimo, dias_reposicion, proveedor, ubicacion)
+      VALUES (@sku, @nombre, @costo, @stockActual, @stockMinimo, @diasReposicion, @proveedor, @ubicacion)
     `),
     actualizar: db.prepare(`
       UPDATE repuestos
          SET sku = @sku, nombre = @nombre, costo = @costo, stock_actual = @stockActual,
-             stock_minimo = @stockMinimo, proveedor = @proveedor, ubicacion = @ubicacion,
+             stock_minimo = @stockMinimo, dias_reposicion = @diasReposicion, proveedor = @proveedor, ubicacion = @ubicacion,
              actualizado_en = datetime('now')
        WHERE id = @id AND activo = 1
+    `),
+    cambiarMinimo: db.prepare(`
+      UPDATE repuestos SET stock_minimo = @minimo, actualizado_en = datetime('now') WHERE id = @id AND activo = 1
     `),
     darDeBaja: db.prepare(`
       UPDATE repuestos SET activo = 0, actualizado_en = datetime('now') WHERE id = ? AND activo = 1
@@ -73,6 +77,7 @@ function crearRepositorioRepuestos(db) {
   const conDefaults = (datos) => ({
     proveedor: null,
     ubicacion: null,
+    diasReposicion: 7,
     ...datos,
   });
 
@@ -83,6 +88,9 @@ function crearRepositorioRepuestos(db) {
     },
     actualizar(id, datos) {
       return sentencias.actualizar.run({ ...conDefaults(datos), id }).changes > 0;
+    },
+    cambiarMinimo(id, minimo) {
+      return sentencias.cambiarMinimo.run({ id, minimo }).changes > 0;
     },
     darDeBaja(id) {
       return sentencias.darDeBaja.run(id).changes > 0;
