@@ -21,6 +21,9 @@ const { crearRepositorioSistema } = require('./modules/sistema/sistema.repositor
 const { crearServicioSistema } = require('./modules/sistema/sistema.service');
 const { crearRepositorioPanel } = require('./modules/panel/panel.repository');
 const { crearServicioPanel } = require('./modules/panel/panel.service');
+const { crearRepositorioClientes } = require('./modules/clientes/cliente.repository');
+const { crearServicioClientes } = require('./modules/clientes/cliente.service');
+const { crearRutasClientes } = require('./modules/clientes/cliente.routes');
 const { manejadorDeErrores } = require('./shared/errorHandler');
 
 /**
@@ -70,7 +73,9 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   const repositorioOrdenes = crearRepositorioOrdenes(db);
   const servicioOrdenes = crearServicioOrdenes(repositorioOrdenes, repositorioUsuarios, repositorioRepuestos, {
     auditoria: servicioAuditoria,
+    ahora,
   });
+  const servicioClientes = crearServicioClientes(crearRepositorioClientes(db), { auditoria: servicioAuditoria });
   const servicioUsuarios = crearServicioUsuarios(repositorioUsuarios, {
     auth: servicioAuth,
     ordenesEnProcesoDe: (mecanicoId) => repositorioOrdenes.contarEnProcesoDeMecanico(mecanicoId),
@@ -84,9 +89,13 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   const gestionInventario = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
   // Panel de administración (usuarios, auditoría, sistema) y panel del dueño (indicadores, reasignar órdenes).
   const administracion = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
-  // Crear órdenes y trabajar en ellas (repuestos, notas): mecánico, dueño y administrador.
-  // La recepcionista solo consulta. El mecánico además solo toca SUS órdenes (lo valida el servicio).
+  // Trabajar en una orden (repuestos, notas, estado): mecánico, dueño y administrador.
+  // El mecánico además solo toca SUS órdenes (lo valida el servicio).
   const trabajanEnOrdenes = autorizar(ROLES.MECANICO, ROLES.DUENO, ROLES.ADMINISTRADOR);
+  // Crear órdenes: también la recepcionista, que recibe el vehículo y elige al mecánico.
+  const creanOrdenes = autorizar(ROLES.MECANICO, ROLES.RECEPCIONISTA, ROLES.DUENO, ROLES.ADMINISTRADOR);
+  // Directorio de clientes y vehículos: quien atiende al público. El mecánico no lo necesita.
+  const atencionAlCliente = autorizar(ROLES.RECEPCIONISTA, ROLES.DUENO, ROLES.ADMINISTRADOR);
 
   // Las respuestas de la API llevan datos del taller: ni el navegador ni un proxy deben guardarlas.
   app.use('/api', (req, res, next) => {
@@ -107,10 +116,13 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   app.get('/api/auditoria/acciones', administracion, (req, res) => res.json(servicioAuditoria.acciones()));
   app.get('/api/sistema/estado', administracion, (req, res) => res.json(servicioSistema.estado()));
   app.use('/api/ordenes', crearRutasOrdenes(servicioOrdenes, {
-    puedenCrear: trabajanEnOrdenes,
+    puedenCrear: creanOrdenes,
     puedenTrabajar: trabajanEnOrdenes,
     puedenReasignar: administracion,
+    soloMecanicos: autorizar(ROLES.MECANICO),
   }));
+  app.use('/api/clientes', atencionAlCliente, crearRutasClientes(servicioClientes));
+  app.get('/api/vehiculos/:placa', atencionAlCliente, (req, res) => res.json(servicioClientes.historialDeVehiculo(req.params.placa)));
   app.get('/api/panel/resumen', administracion, (req, res) => res.json(servicioPanel.resumen()));
 
   app.use('/api', (req, res) => {
@@ -130,6 +142,7 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
       usuarios: servicioUsuarios,
       sistema: servicioSistema,
       panel: servicioPanel,
+      clientes: servicioClientes,
     },
   };
 }
