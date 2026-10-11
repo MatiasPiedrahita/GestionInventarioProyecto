@@ -47,10 +47,13 @@ Cada historia tiene una prueba de aceptación escrita como **Dado / Cuando / Ent
 
 | Rol | Al iniciar sesión entra a | Puede |
 |---|---|---|
-| **Dueño del taller** | Inventario | Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas. Cambiar el estado de cualquier orden y **reabrir** las que ya se cerraron |
-| **Administrador** | Inventario | Lo mismo que el dueño. La predicción de demanda llegará en el Sprint 3 |
+| **Dueño del taller** | Inventario | Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas. Cambiar el estado de cualquier orden y **reabrir** las que ya se cerraron. Entra también al panel de administración y es el **único** que crea o modifica dueños y administradores |
+| **Administrador** | Administración | **Panel de administración:** crear usuarios (mecánicos y recepcionistas), editarlos, activarlos o desactivarlos, asignarles una contraseña temporal, cerrar sus sesiones y desbloquearlos; consultar la auditoría y el estado del sistema. Además gestiona el inventario y las órdenes. No puede tocar cuentas de dueño ni de otros administradores |
 | **Mecánico** | Órdenes de trabajo | Crear órdenes, que quedan a su nombre. Ver **solo sus** órdenes. Registrar repuestos usados (se descuentan del stock) y escribir notas de la reparación. Finalizar o cancelar sus órdenes desde el tablero. Consultar el inventario, pero no modificarlo |
 | **Recepcionista** | Órdenes de trabajo | Consultar el listado global con filtros por placa, cliente, mecánico y estado. No puede modificar nada |
+| **Todos** | — | "Mi cuenta": cambiar su contraseña y cerrar su sesión en todos los dispositivos |
+
+Reglas de protección de las cuentas: nadie se desactiva ni se cambia el rol a sí mismo; siempre queda al menos un dueño activo; un mecánico con órdenes en proceso no se puede desactivar ni cambiar de rol hasta reasignarlas.
 
 La interfaz oculta lo que cada rol no puede usar, pero **la seguridad real está en la API**: cada petición verifica la sesión y el rol, y responde `401` o `403` si no corresponde.
 
@@ -130,13 +133,13 @@ npm test                 # todas las pruebas
 npm run test:cobertura   # con reporte de cobertura
 ```
 
-Resultado actual: **273 pruebas en 29 suites, todas en verde.**
+Resultado actual: **351 pruebas en 32 suites, todas en verde.**
 
 | Tipo | Carpeta | Qué verifican |
 |---|---|---|
 | Aceptación | `tests/aceptacion/` | Un archivo por historia, con escenarios Dado/Cuando/Entonces |
-| Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error y seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría) |
-| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", tablero Kanban y cambio de estado |
+| Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría) y administración de usuarios |
+| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", panel de administración, tablero Kanban y cambio de estado |
 | Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros, cambio de estado), reglas de transición, lector de CSV, política y hash de contraseñas, y limitador de intentos |
 
 Cada prueba crea su propia base de datos en memoria y sus propios usuarios (`tests/helpers/contexto.js`), así que las pruebas no dependen unas de otras.
@@ -182,7 +185,9 @@ src/
 │   ├── auditoria/               Registro de acciones sensibles (quién, qué y cuándo)
 │   ├── auth/                    Roles, contraseñas, sesiones, límite de intentos, middleware y rutas
 │   ├── inventario/              Repuestos, CSV e historial de movimientos
-│   └── ordenes/                 Órdenes, clientes, vehículos, repuestos usados, notas, filtros y estados
+│   ├── ordenes/                 Órdenes, clientes, vehículos, repuestos usados, notas, filtros y estados
+│   ├── sistema/                 Estado del sistema para el panel de administración
+│   └── usuarios/                Administración de usuarios (quién gestiona a quién)
 └── shared/                      Errores de dominio, manejador de errores y limitador de intentos
 public/
 ├── index.html, styles.css
@@ -212,6 +217,15 @@ Todas las rutas, salvo `/api/salud` y `/api/auth/login`, exigen la cabecera `Aut
 | POST | `/api/repuestos/importar` | Dueño, admin | Carga masiva por CSV |
 | GET | `/api/repuestos/:id/movimientos` | Dueño, admin | Historial del repuesto |
 | GET | `/api/usuarios/mecanicos` | Con sesión | Mecánicos activos |
+| GET | `/api/usuarios` | Dueño, admin | Todas las cuentas con su estado (activa, bloqueada, sesiones abiertas) y los roles que el actor puede asignar |
+| POST | `/api/usuarios` | Dueño, admin | Crea un usuario y devuelve su contraseña temporal una sola vez. El admin solo crea mecánicos y recepcionistas |
+| PUT | `/api/usuarios/:id` | Dueño, admin | Edita nombre, rol y correo |
+| PATCH | `/api/usuarios/:id/estado` | Dueño, admin | Activa o desactiva la cuenta: `{ activo }` |
+| POST | `/api/usuarios/:id/password` | Dueño, admin | Asigna una contraseña temporal nueva y cierra las sesiones |
+| POST | `/api/usuarios/:id/desbloqueo` | Dueño, admin | Quita el bloqueo por intentos fallidos |
+| DELETE | `/api/usuarios/:id/sesiones` | Dueño, admin | Cierra todas las sesiones del usuario |
+| GET | `/api/auditoria?usuarioId=&accion=&desde=&hasta=&pagina=&tamano=` | Dueño, admin | Registro de auditoría paginado |
+| GET | `/api/sistema/estado` | Dueño, admin | Versiones, tiempo encendido y tamaño de los datos |
 | GET | `/api/ordenes?placa=&cliente=&mecanicoId=&estado=&pagina=&tamano=` | Con sesión | Listado paginado. `estado`: `ACTIVAS`, `HISTORICAS`, `EN_PROCESO`, `FINALIZADA` o `CANCELADA`. El mecánico solo recibe las suyas |
 | POST | `/api/ordenes` | Mecánico, dueño, admin | Crea una orden en estado "En proceso" |
 | GET | `/api/ordenes/:id` | Con sesión (el mecánico, solo las suyas) | Detalle con repuestos usados, total y notas |
@@ -292,6 +306,7 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 - Proponer la arquitectura por capas y la estructura de carpetas a partir de nuestros diagramas (clases, componentes, C4).
 - Generar el código de las historias HU-01 a HU-07: autenticación y roles, inventario, órdenes, repuestos usados, notas, listado con filtros, cambio de estado con tablero Kanban, migraciones de la base de datos e interfaz web.
 - Endurecer la seguridad: límite de intentos de inicio de sesión, cambio de contraseña, cabeceras, auditoría.
+- Proponer qué puede hacer cada rol y construir el panel de administración.
 - Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.
 - Redactar este README y la documentación en `docs/`.
