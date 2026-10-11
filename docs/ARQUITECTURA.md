@@ -4,7 +4,7 @@ Este documento explica **por qué** el código está organizado así. Los diagra
 
 ## Relación con los diagramas
 
-| Diagrama | Qué está implementado (Sprints 1 y 2) |
+| Diagrama | Qué está implementado (Sprints 1 y 2, y alertas del Sprint 3) |
 |---|---|
 | Clases | `Usuario` con rol, `Repuesto`, `MovimientoInventario`, `Cliente`, `Vehiculo`, `OrdenTrabajo` y `DetalleRepuesto` (composición con la orden) |
 | Componentes | Interfaz de usuario → API REST → módulos **Auth**, **Inventario** y **Órdenes** → Base de datos |
@@ -12,7 +12,7 @@ Este documento explica **por qué** el código está organizado así. Los diagra
 | Secuencia | El flujo "registrar repuestos y descontar stock" sigue el diagrama: API de órdenes → inventario → base de datos, en una sola transacción |
 | Casos de uso | "Gestionar inventario de repuestos" y su `<<include>>` "Descontar stock" desde la orden |
 
-Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el servicio externo de email/push corresponden al Sprint 3.
+Del Sprint 3 ya existen la *Tarea Programada* (`src/tareas/programador.js`, que revisa el stock) y la conexión con el servicio externo de correo (`modules/notificaciones/correo.js`, simulado o SMTP). Falta el *Servicio de Predicción*.
 
 ## Decisiones (ADR resumidos)
 
@@ -146,6 +146,20 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 - **Historial de un vehículo que cambió de dueño:** cada orden conserva el cliente que lo trajo ese día; el vehículo muestra su dueño actual.
 - **Mi resumen del mecánico:** una consulta propia (`/api/ordenes/mi-resumen`) en lugar de reutilizar el panel del dueño, para que el mecánico nunca reciba datos de otros.
 
+### ADR-18 · Alertas de stock: por evento y por tarea programada, con correo simulado por defecto
+
+- **Contexto (HU-08):** el dueño debe enterarse cuando un repuesto llega a su mínimo, en la aplicación y, si quiere, por correo. El plan preveía una tarea programada, un servicio de notificaciones y una vista de alertas.
+- **Dos disparadores, una sola regla.** Si solo existiera la tarea programada, el dueño se enteraría hasta 15 minutos tarde. Si solo se alertara por evento, un cambio hecho por fuera de la aplicación nunca generaría alerta. Por eso el servicio `alertas.revisar()` se llama desde los dos lados: los servicios de inventario y órdenes avisan `stockCambiado` después de guardar, y el programador lo ejecuta cada 15 minutos (`ALERTAS_INTERVALO_MIN`).
+- **Idempotencia garantizada por la base.** Un índice único parcial impide dos alertas abiertas del mismo tipo para un repuesto. Las reglas (`alerta.reglas.js`) son funciones puras: dado el stock y la alerta abierta, deciden crear, escalar a "agotado", rebajar, resolver o no hacer nada.
+- **Módulos desacoplados por eventos.** Inventario y órdenes no conocen a alertas ni a notificaciones: reciben un objeto `eventos` y `app.js` conecta cada aviso con su destino. Sin conexión (scripts, pruebas unitarias) los avisos no hacen nada.
+- **El aviso no puede tumbar la operación.** El repuesto ya quedó registrado cuando se calculan las alertas. Si esa parte falla, se deja el error en el registro del servidor y la respuesta al mecánico sigue siendo exitosa; la tarea programada lo recupera en la siguiente revisión.
+- **Un correo por persona, no uno por alerta.** Una revisión que encuentra cinco repuestos bajos envía un solo correo que los resume.
+- **Correo simulado por defecto.** El transporte tiene dos implementaciones con la misma interfaz. Sin `SMTP_HOST`, el correo se guarda en `correos_salientes` con estado `SIMULADO` y se puede leer en Administración: el proyecto se levanta y se demuestra sin cuenta de correo ni secretos. Con `SMTP_HOST` en el `.env`, se envía con `nodemailer` y el registro pasa de `PENDIENTE` a `ENVIADO` o `ERROR`.
+- **El envío es asíncrono y no bloquea.** La notificación de la campana se guarda en la misma operación; el correo se entrega aparte. Si el servidor SMTP está caído, el usuario no espera ni recibe un error.
+- **Privacidad:** cada usuario decide en "Mi cuenta" si recibe correos. Una notificación solo la puede leer o marcar su dueño (la consulta filtra por usuario; pedir la de otro responde 404).
+- **Faltante reportado por el mecánico:** cubre el caso en que el sistema dice que hay stock pero la pieza no aparece o no sirve. Se resuelve cuando entra mercancía.
+- **Preparado para la predicción:** el tipo `QUIEBRE_PROYECTADO` ya existe en la tabla; lo generará el modelo cuando el stock esté sobre el mínimo pero no alcance hasta el próximo pedido.
+
 ## Requisitos no funcionales cubiertos
 
 | RNF | Cómo se atiende |
@@ -154,5 +168,5 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 | Velocidad (< 2 s) | Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
 | Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, más de 200 pruebas (unitarias, integración, aceptación e interfaz) y CI |
-| Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `panel`, `clientes`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
+| Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `panel`, `clientes`, `inventario`, `ordenes`, `alertas`, `notificaciones`) conectados por eventos; el siguiente será `prediccion` |
 | Seguridad | Contraseñas con `scrypt`, sesiones con vencimiento, bloqueo por intentos fallidos, permisos por rol y por propiedad en la API, cabeceras con CSP, auditoría, consultas parametrizadas y ningún secreto en el repositorio (ADR-08, ADR-09, ADR-14) |

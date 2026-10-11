@@ -13,7 +13,7 @@ Proyecto de semestre de **Ingeniería de Software (UPB, 2026-2)**. Es una aplica
 
 ## Estado del proyecto
 
-El repositorio cubre los **Sprints 1 y 2 completos** del plan de trabajo.
+El repositorio cubre los **Sprints 1 y 2 completos** y la primera historia del **Sprint 3** (alertas de stock bajo).
 
 | Sprint | ID | Historia de usuario | Rol | Estado |
 |---|---|---|---|---|
@@ -24,7 +24,7 @@ El repositorio cubre los **Sprints 1 y 2 completos** del plan de trabajo.
 | 2 | HU-05 | Agregar notas o detalles de la reparación | Mecánico | ✅ |
 | 2 | HU-06 | Ver listado de órdenes de trabajo | Recepcionista | ✅ |
 | 2 | HU-07 | Actualización del estado de órdenes | Mecánico | ✅ |
-| 3 | — | Alertas de stock bajo | Dueño | Pendiente |
+| 3 | HU-08 | Alertas de stock bajo | Dueño | ✅ |
 | 3 | — | Predicción de demanda de repuestos | Administrador | Pendiente |
 
 ### Criterios de aceptación y su prueba automática
@@ -40,6 +40,7 @@ Cada historia tiene una prueba de aceptación escrita como **Dado / Cuando / Ent
 | HU-05 Notas | La nota se guarda y se ve igual al recargar | `tests/aceptacion/HU05.notas-de-reparacion.test.js` |
 | HU-06 Listado | Filtrar por placa devuelve solo coincidencias exactas | `tests/aceptacion/HU06.listado-ordenes.test.js` |
 | HU-07 Estado de órdenes | Finalizar una orden con 2 filtros consumidos deja descontadas 2 unidades en la base | `tests/aceptacion/HU07.actualizacion-estado.test.js` |
+| HU-08 Alertas de stock | Al llegar el stock a su mínimo se genera la alerta y el dueño es notificado (campana y correo) | `tests/aceptacion/HU08.alertas-stock-bajo.test.js` |
 
 > **Sobre la HU-07:** el plan decía "descontar el stock al finalizar". En este sistema el stock se descuenta cuando el mecánico registra el repuesto (HU-04), para que el inventario siempre muestre lo que hay en el estante. Finalizar solo cambia el estado; la prueba confirma que el descuento en la base es de exactamente 2 unidades, una sola vez. Ver ADR-10 y ADR-12.
 
@@ -47,11 +48,11 @@ Cada historia tiene una prueba de aceptación escrita como **Dado / Cuando / Ent
 
 | Rol | Al iniciar sesión entra a | Puede |
 |---|---|---|
-| **Dueño del taller** | Panel | **Panel del taller:** valor del inventario, stock por reponer, órdenes por semana, costo de repuestos por mes, repuestos más usados y trabajo por mecánico. **Reasignar** órdenes a otro mecánico y registrar **entradas de mercancía**. Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas. Cambiar el estado de cualquier orden y **reabrir** las que ya se cerraron. Entra también al panel de administración y es el **único** que crea o modifica dueños y administradores |
-| **Administrador** | Administración | **Panel de administración:** crear usuarios (mecánicos y recepcionistas), editarlos, activarlos o desactivarlos, asignarles una contraseña temporal, cerrar sus sesiones y desbloquearlos; consultar la auditoría y el estado del sistema. Además ve el panel del taller, gestiona el inventario y las órdenes, y reasigna órdenes. No puede tocar cuentas de dueño ni de otros administradores |
-| **Mecánico** | Órdenes de trabajo (tablero) | **Mi resumen:** sus órdenes abiertas, las que cerró y los repuestos que usó en 30 días. Crear órdenes, que quedan a su nombre. Ver **solo sus** órdenes. Registrar repuestos usados (se descuentan del stock) y escribir notas de la reparación. Finalizar o cancelar sus órdenes desde el tablero. Consultar el inventario, pero no modificarlo. No ve el directorio de clientes |
+| **Dueño del taller** | Panel | **Panel del taller:** valor del inventario, stock por reponer, órdenes por semana, costo de repuestos por mes, repuestos más usados y trabajo por mecánico. **Alertas de stock:** recibe el aviso en la campana (y por correo si lo activa) cuando un repuesto llega a su mínimo, y marca cuándo ya hizo el pedido. **Reasignar** órdenes a otro mecánico y registrar **entradas de mercancía**. Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas. Cambiar el estado de cualquier orden y **reabrir** las que ya se cerraron. Entra también al panel de administración y es el **único** que crea o modifica dueños y administradores |
+| **Administrador** | Administración | **Panel de administración:** crear usuarios (mecánicos y recepcionistas), editarlos, activarlos o desactivarlos, asignarles una contraseña temporal, cerrar sus sesiones y desbloquearlos; consultar la auditoría y el estado del sistema. Además ve el panel del taller y las alertas de stock, gestiona el inventario y las órdenes, reasigna órdenes y revisa la bandeja de salida de correos. No puede tocar cuentas de dueño ni de otros administradores |
+| **Mecánico** | Órdenes de trabajo (tablero) | **Mi resumen:** sus órdenes abiertas, las que cerró y los repuestos que usó en 30 días. Crear órdenes, que quedan a su nombre. Ver **solo sus** órdenes. Registrar repuestos usados (se descuentan del stock) y escribir notas de la reparación. Finalizar o cancelar sus órdenes desde el tablero. **Avisar al dueño** cuando un repuesto falta o no sirve para un trabajo. Recibe en la campana las órdenes que le asignan. Consultar el inventario, pero no modificarlo. No ve el directorio de clientes |
 | **Recepcionista** | Órdenes de trabajo | **Recibir vehículos:** crea la orden eligiendo el mecánico; al escribir el documento o la placa de alguien conocido, el formulario se completa solo. **Clientes y vehículos:** buscar por nombre, documento, teléfono o placa, corregir el contacto y ver el historial de cada vehículo. Consultar el listado global con filtros. No registra repuestos ni notas, ni cambia estados |
-| **Todos** | — | "Mi cuenta": cambiar su contraseña y cerrar su sesión en todos los dispositivos |
+| **Todos** | — | "Mi cuenta": cambiar su contraseña, cerrar su sesión en todos los dispositivos y elegir si quiere los avisos también por correo. **Campana** de notificaciones |
 
 Reglas de protección de las cuentas: nadie se desactiva ni se cambia el rol a sí mismo; siempre queda al menos un dueño activo; un mecánico con órdenes en proceso no se puede desactivar ni cambiar de rol hasta reasignarlas.
 
@@ -122,7 +123,8 @@ Abra **http://localhost:3000** e inicie sesión. La base de datos se crea en `da
 4. En el tablero, arrastrar la tarjeta a "Finalizadas" (o usar el botón **Finalizar**): el stock no cambia. Cancelar otra orden con repuestos: vuelven al inventario.
 5. Intentar entrar a `http://localhost:3000/#inventario`: lo devuelve a órdenes, porque no es su vista.
 6. Entrar como **`recepcion`**: filtrar por placa `ABC123` (solo salen esas), por estado "Históricas" y por mecánico. Crear una orden escribiendo un documento que ya exista: el nombre y el teléfono se completan solos. En "Clientes", buscar por placa y abrir la ficha.
-7. Entrar como **`dueno`**: en Inventario, abrir el historial del repuesto usado y ver los movimientos "Usado en la orden #N" y "Devuelto al cancelar la orden #N". En Órdenes, reabrir una orden finalizada.
+7. Como **`mecanico1`**, registrar repuestos hasta dejar uno en su mínimo. Entrar como **`dueno`**: la campana muestra el aviso y la sección "Alertas" lo lista. En "Mi cuenta" activar los avisos por correo, repetir con otro repuesto y ver el correo simulado en Administración > Sistema.
+8. Como **`dueno`**: en Inventario, abrir el historial del repuesto usado y ver los movimientos "Usado en la orden #N" y "Devuelto al cancelar la orden #N". En Órdenes, reabrir una orden finalizada.
 
 ---
 
@@ -133,14 +135,14 @@ npm test                 # todas las pruebas
 npm run test:cobertura   # con reporte de cobertura
 ```
 
-Resultado actual: **456 pruebas en 38 suites, todas en verde.**
+Resultado actual: **547 pruebas en 42 suites, todas en verde.**
 
 | Tipo | Carpeta | Qué verifican |
 |---|---|---|
 | Aceptación | `tests/aceptacion/` | Un archivo por historia, con escenarios Dado/Cuando/Entonces |
-| Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría), administración de usuarios, panel del taller y directorio de clientes |
-| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", panel de administración, panel del taller con sus gráficos, recepción (clientes, vehículos y autocompletado), tablero Kanban y cambio de estado |
-| Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros, cambio de estado), reglas de transición, lector de CSV, política y hash de contraseñas, y limitador de intentos |
+| Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría), administración de usuarios, panel del taller, directorio de clientes, alertas de stock y notificaciones (en la aplicación y por correo) |
+| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", panel de administración, panel del taller con sus gráficos, recepción (clientes, vehículos y autocompletado), campana de notificaciones, alertas de stock, tablero Kanban y cambio de estado |
+| Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros, cambio de estado), reglas de transición y de alertas, tareas programadas, lector de CSV, política y hash de contraseñas, y limitador de intentos |
 
 Cada prueba crea su propia base de datos en memoria y sus propios usuarios (`tests/helpers/contexto.js`), así que las pruebas no dependen unas de otras.
 
@@ -167,9 +169,11 @@ Navegador (public/)        Login, menú por rol y vistas (inventario, órdenes)
         ▼
 Middleware de sesión y rol (modules/auth)   401 sin sesión, 403 sin permiso
         ▼
-Rutas → Servicios → Repositorios            por módulo: auth, inventario, ordenes
+Rutas → Servicios → Repositorios            por módulo de dominio (ver abajo)
+        │                                   Tarea programada: revisa el stock cada 15 min
+        │                                   Correo: simulado, o SMTP si está en el .env
         ▼
-SQLite + migraciones versionadas (src/db/migraciones/001…008)
+SQLite + migraciones versionadas (src/db/migraciones/001…009)
 ```
 
 ```
@@ -181,16 +185,20 @@ src/
 │   └── migraciones/             001 inventario · 002 usuarios y sesiones · 003 órdenes
 │                                004 repuestos usados · 005 notas · 006 índices
 │                                007 estado de órdenes · 008 seguridad de cuentas
+│                                009 alertas y notificaciones
 ├── modules/
+│   ├── alertas/                 Alertas de stock bajo: reglas, revisión y atención
 │   ├── auditoria/               Registro de acciones sensibles (quién, qué y cuándo)
 │   ├── auth/                    Roles, contraseñas, sesiones, límite de intentos, middleware y rutas
 │   ├── clientes/                Directorio de clientes y vehículos (recepción)
 │   ├── inventario/              Repuestos, CSV, entradas de mercancía e historial de movimientos
+│   ├── notificaciones/          Campana de la aplicación y correo (simulado o SMTP)
 │   ├── ordenes/                 Órdenes, clientes, vehículos, repuestos usados, notas, filtros y estados
 │   ├── panel/                   Indicadores del negocio para el dueño (consultas agregadas)
 │   ├── sistema/                 Estado del sistema para el panel de administración
 │   └── usuarios/                Administración de usuarios (quién gestiona a quién)
-└── shared/                      Errores de dominio, manejador de errores y limitador de intentos
+├── shared/                      Errores de dominio, manejador de errores, limitador de intentos y eventos
+└── tareas/                      Programador de tareas periódicas
 public/
 ├── index.html, styles.css
 └── js/                          api.js (token), comun.js, graficos.js (SVG propio), app.js (enrutador por rol), vistas/
@@ -240,6 +248,14 @@ Todas las rutas, salvo `/api/salud` y `/api/auth/login`, exigen la cabecera `Aut
 | PATCH | `/api/ordenes/:id/notas` | Mecánico (suyas), dueño, admin | Guarda las notas de la reparación |
 | PATCH | `/api/ordenes/:id/estado` | Mecánico (suyas), dueño, admin | Cambia el estado: `{ estado, motivo?, devolverRepuestos? }`. Cancelar y reabrir exigen `motivo`. Reabrir es solo para dueño y admin |
 | PATCH | `/api/ordenes/:id/mecanico` | Dueño, admin | Reasigna una orden en proceso: `{ mecanicoId }` |
+| GET | `/api/alertas?estado=ABIERTAS\|RESUELTAS&pagina=` | Dueño, admin | Alertas de stock abiertas (lo más urgente primero) o el historial |
+| PATCH | `/api/alertas/:id/atender` | Dueño, admin | Marca que ya se hizo el pedido: `{ nota? }` |
+| POST | `/api/alertas/revisar` | Dueño, admin | Revisa todo el inventario ahora (lo mismo que hace la tarea programada) |
+| POST | `/api/repuestos/:id/faltantes` | Mecánico, dueño, admin | Avisa que un repuesto falta para un trabajo: `{ nota? }` |
+| GET | `/api/notificaciones?soloNoLeidas=&limite=` | Con sesión | Los avisos del usuario y cuántos tiene sin leer |
+| PATCH · POST | `/api/notificaciones/:id/leida` · `/leer-todas` | Con sesión | Marca como leídos los avisos propios |
+| GET · PUT | `/api/notificaciones/preferencias` | Con sesión | Correo del usuario y si quiere recibir ahí los avisos |
+| GET | `/api/correos` | Dueño, admin | Bandeja de salida: los correos enviados o simulados |
 | GET | `/api/panel/resumen` | Dueño, admin | Indicadores del negocio: inventario, órdenes por semana, costo de repuestos por mes, más usados y trabajo por mecánico |
 | GET | `/api/ordenes/:id/historial` | Con sesión (el mecánico, solo las suyas) | Cambios de estado de la orden: quién, cuándo y por qué |
 
@@ -257,6 +273,16 @@ Todos los errores tienen la misma forma:
 | 404 | No existe (`NO_ENCONTRADO`) |
 | 429 | Demasiados intentos fallidos; la cabecera `Retry-After` dice cuánto esperar (`DEMASIADOS_INTENTOS`) |
 | 409 | Conflicto: SKU repetido, stock insuficiente, orden que ya no está en proceso o cambio de estado que no existe (`CONFLICTO`) |
+
+### Alertas de stock y notificaciones (HU-08)
+
+- **Cuándo se alerta:** cuando el stock de un repuesto llega a su mínimo o baja de él (`stock <= mínimo`). Si llega a cero, la alerta pasa a "Agotado" y se vuelve a avisar.
+- **Cómo se genera:** al instante, cada vez que cambia el stock (uso en una orden, ajuste, entrada, carga por CSV, cancelación), y además una **tarea programada** revisa todo el inventario cada 15 minutos. Revisar muchas veces nunca duplica alertas.
+- **A quién se avisa:** al dueño y a los administradores activos. Siempre en la **campana** de la aplicación; por **correo** solo a quien lo activó en "Mi cuenta".
+- **Ciclo de la alerta:** *Sin atender* → *Pedido hecho* (el dueño marca que ya pidió) → *Resuelta* (se cierra sola cuando el stock supera el mínimo).
+- **Faltante reportado:** el mecánico puede avisar que un repuesto falta o no sirve aunque el sistema diga que hay.
+
+**El correo es simulado por defecto.** Sin configurar nada, los correos no salen: quedan en la bandeja de salida, visible en **Administración > Sistema**. Para enviarlos de verdad, copie `.env.example` como `.env` y complete `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` y `SMTP_PASS` con los datos de su proveedor de correo. El `.env` nunca se sube al repositorio.
 
 ### Seguridad
 
@@ -316,6 +342,7 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 - Generar el código de las historias HU-01 a HU-07: autenticación y roles, inventario, órdenes, repuestos usados, notas, listado con filtros, cambio de estado con tablero Kanban, migraciones de la base de datos e interfaz web.
 - Endurecer la seguridad: límite de intentos de inicio de sesión, cambio de contraseña, cabeceras, auditoría.
 - Proponer qué puede hacer cada rol y construir el panel de administración, el panel del taller con sus gráficos y las funciones de recepción.
+- Construir las alertas de stock bajo con notificaciones en la aplicación y por correo.
 - Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.
 - Redactar este README y la documentación en `docs/`.
