@@ -126,7 +126,7 @@ npm test                 # todas las pruebas
 npm run test:cobertura   # con reporte de cobertura
 ```
 
-Resultado actual: **102 pruebas en 18 suites, todas en verde.**
+Resultado actual: **163 pruebas en 22 suites, todas en verde.**
 
 | Tipo | Carpeta | Qué verifican |
 |---|---|---|

@@ -135,6 +135,17 @@ describe('API /api/repuestos (integración: HTTP + lógica + base de datos)', ()
       expect((await dueno.get('/api/repuestos')).body).toHaveLength(0);
     });
 
+    test('rechaza la carga completa si un SKU ya existe en el inventario', async () => {
+      await dueno.post('/api/repuestos').send(filtro);
+      const csv = 'sku,nombre,costo,stockActual\nA-1,Tornillo,500,100\nfil-ace-001,Filtro repetido,100,1\n';
+
+      const res = await dueno.post('/api/repuestos/importar').set('Content-Type', 'text/csv').send(csv);
+
+      expect(res.status).toBe(400);
+      expect(res.body.detalles).toEqual([{ fila: 3, campo: 'sku', mensaje: 'SKU FIL-ACE-001 ya existe en el inventario' }]);
+      expect((await dueno.get('/api/repuestos')).body).toHaveLength(1);
+    });
+
     test('rechaza un CSV vacío o sin filas de datos', async () => {
       const vacio = await dueno.post('/api/repuestos/importar').set('Content-Type', 'text/csv').send('');
       const soloEncabezado = await dueno.post('/api/repuestos/importar').set('Content-Type', 'text/csv').send('sku,nombre\n');

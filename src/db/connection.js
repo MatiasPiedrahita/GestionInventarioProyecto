@@ -65,7 +65,13 @@ function crearConexion(ruta = ':memory:') {
   if (!enMemoria) {
     db.exec('PRAGMA journal_mode = WAL;');
   }
-  aplicarMigraciones(db);
+  try {
+    aplicarMigraciones(db);
+  } catch (error) {
+    // Sin esto el archivo queda bloqueado (en Windows no se puede ni copiar).
+    db.close();
+    throw error;
+  }
   return db;
 }
 
