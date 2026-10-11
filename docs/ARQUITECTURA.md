@@ -135,6 +135,17 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 - **Indicadores como cifras, no como gráficos:** un solo número (valor del inventario, órdenes en proceso) se lee mejor como cifra. El aviso de stock lleva símbolo y texto, no solo color.
 - **Acciones del dueño:** reasignar una orden en proceso a otro mecánico (queda en la auditoría) y registrar entradas de mercancía con el movimiento `ENTRADA`, distinto del ajuste manual: el historial distingue "llegó mercancía" de "se corrigió un conteo".
 
+### ADR-17 · La recepcionista recibe vehículos (cambia una decisión anterior)
+
+- **Decisión anterior:** en la HU-06 la recepcionista solo consultaba; una prueba exigía `403` si intentaba crear una orden.
+- **Por qué cambia:** en un taller quien recibe el vehículo y habla con el cliente es recepción. Obligar al mecánico a dejar la herramienta para digitar la orden no refleja el trabajo real, y dejaba al rol sin ninguna función propia.
+- **Decisión:** la recepcionista **crea** órdenes (eligiendo el mecánico, igual que el dueño) y gestiona el **directorio de clientes y vehículos**. Sigue sin poder registrar repuestos, escribir notas, cambiar estados ni reasignar: eso es trabajo del mecánico o decisión del dueño. La prueba del `403` se reemplazó por dos: una que crea la orden y otra que confirma que no puede trabajar en ella.
+- **Permisos separados:** en `app.js` ya no hay un solo grupo "trabajan en órdenes". `creanOrdenes` incluye a recepción; `trabajanEnOrdenes` no.
+- **El mecánico no ve el directorio:** conoce a los clientes de sus órdenes, pero no puede recorrer la lista completa de clientes y teléfonos del taller (`403`). Es el principio de mínimo privilegio aplicado a datos personales.
+- **Autocompletado:** al escribir un documento o una placa ya registrados, el formulario se completa con los datos conocidos **sin pisar lo que la persona ya escribió**, y avisa cuántas órdenes anteriores hay (y si alguna sigue abierta, para no duplicarla).
+- **Historial de un vehículo que cambió de dueño:** cada orden conserva el cliente que lo trajo ese día; el vehículo muestra su dueño actual.
+- **Mi resumen del mecánico:** una consulta propia (`/api/ordenes/mi-resumen`) en lugar de reutilizar el panel del dueño, para que el mecánico nunca reciba datos de otros.
+
 ## Requisitos no funcionales cubiertos
 
 | RNF | Cómo se atiende |
@@ -143,5 +154,5 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 | Velocidad (< 2 s) | Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
 | Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, más de 200 pruebas (unitarias, integración, aceptación e interfaz) y CI |
-| Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `panel`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
+| Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `panel`, `clientes`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
 | Seguridad | Contraseñas con `scrypt`, sesiones con vencimiento, bloqueo por intentos fallidos, permisos por rol y por propiedad en la API, cabeceras con CSP, auditoría, consultas parametrizadas y ningún secreto en el repositorio (ADR-08, ADR-09, ADR-14) |
