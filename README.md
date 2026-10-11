@@ -68,9 +68,12 @@ La interfaz oculta lo que cada rol no puede usar, pero **la seguridad real está
 |---|---|---|
 | [Node.js](https://nodejs.org/) | **22.13 o superior** (LTS) | `node -v` |
 | npm | viene con Node | `npm -v` |
+| [Python](https://www.python.org/) | **3.11 o superior** (solo para la predicción de demanda) | `python --version` |
 | Git | cualquiera reciente | `git --version` |
 
 No hace falta instalar ninguna base de datos. El proyecto usa SQLite a través del módulo `node:sqlite` que ya trae Node.js.
+
+Python solo se necesita para el modelo de predicción. Sin Python, todo lo demás funciona igual.
 
 ### 2. Clonar e instalar
 
@@ -78,6 +81,7 @@ No hace falta instalar ninguna base de datos. El proyecto usa SQLite a través d
 git clone https://github.com/MatiasPiedrahita/GestionInventarioProyecto.git
 cd GestionInventarioProyecto
 npm ci
+npm run prediccion:instalar     # opcional: crea .venv con las librerías del modelo de predicción
 ```
 
 ### 3. Cargar datos de ejemplo y crear usuarios
@@ -98,6 +102,14 @@ Crea 6 repuestos, 12 órdenes de ejemplo y estos usuarios:
 **Contraseñas:** por seguridad no están en el repositorio. El seed genera una contraseña aleatoria por usuario y **la muestra una sola vez en la consola**; anótala. Si prefieren una contraseña común para pruebas, copien `.env.example` como `.env` y escriban un valor en `DEMO_PASSWORD` **antes** de correr el seed. El archivo `.env` nunca se sube al repositorio.
 
 El seed se puede correr varias veces: no duplica nada.
+
+Para probar la **predicción de demanda** hace falta historia. Este comando simula dos años y medio de trabajo del taller (unas 800 órdenes, 12 repuestos con patrones de consumo distintos):
+
+```bash
+npm run seed:historial
+```
+
+Los datos son inventados y siempre salen iguales. No lo ejecute sobre la base real de un taller.
 
 Para crear otro usuario:
 
@@ -131,17 +143,19 @@ Abra **http://localhost:3000** e inicie sesión. La base de datos se crea en `da
 ## Cómo correr las pruebas
 
 ```bash
-npm test                 # todas las pruebas
+npm test                 # todas las pruebas de la aplicación (Jest)
 npm run test:cobertura   # con reporte de cobertura
+npm run test:python      # pruebas del modelo de predicción (pytest); antes: npm run prediccion:instalar -- --dev
 ```
 
-Resultado actual: **547 pruebas en 42 suites, todas en verde.**
+Resultado actual: **562 pruebas de la aplicación (Jest) en 44 suites y 184 del modelo (pytest), todas en verde.**
 
 | Tipo | Carpeta | Qué verifican |
 |---|---|---|
 | Aceptación | `tests/aceptacion/` | Un archivo por historia, con escenarios Dado/Cuando/Entonces |
 | Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría), administración de usuarios, panel del taller, directorio de clientes, alertas de stock y notificaciones (en la aplicación y por correo) |
 | Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", panel de administración, panel del taller con sus gráficos, recepción (clientes, vehículos y autocompletado), campana de notificaciones, alertas de stock, tablero Kanban y cambio de estado |
+| Modelo (Python) | `prediccion/tests/` | El modelo de predicción: series, patrones de demanda, cada modelo de pronóstico, evaluación con origen móvil, política de inventario, clasificación ABC, contrato y línea de comandos |
 | Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros, cambio de estado), reglas de transición y de alertas, tareas programadas, lector de CSV, política y hash de contraseñas, y limitador de intentos |
 
 Cada prueba crea su propia base de datos en memoria y sus propios usuarios (`tests/helpers/contexto.js`), así que las pruebas no dependen unas de otras.
@@ -150,12 +164,13 @@ Cada prueba crea su propia base de datos en memoria y sus propios usuarios (`tes
 
 ## Pipeline de integración continua
 
-Archivo: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Se ejecuta en **cada push y cada pull request**, con dos jobs en paralelo:
+Archivo: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Se ejecuta en **cada push y cada pull request**, con tres jobs en paralelo:
 
 | Job | Pasos |
 |---|---|
 | **Build y pruebas** | `npm ci` → `npm run build` (verifica la sintaxis de todos los archivos y que la app se construya) → `npm run test:cobertura` → publica el reporte de cobertura como artefacto |
-| **Análisis de vulnerabilidades** | `npm ci` → `npm audit --audit-level=high` |
+| **Modelo de predicción (Python)** | Python 3.12 → `pip install -r prediccion/requirements-dev.txt` → `pytest` |
+| **Análisis de vulnerabilidades** | `npm ci` → `npm audit --audit-level=high` → `pip-audit` sobre las librerías de Python |
 
 ---
 
@@ -205,7 +220,8 @@ public/
 tests/
 ├── aceptacion/  integration/  interfaz/  unit/  helpers/
 scripts/
-└── build.js · seed.js · crear-usuario.js
+└── build.js · seed.js · seed-historial.js · crear-usuario.js · prediccion-instalar.js · prediccion-python.js
+prediccion/                      Modelo de predicción en Python (paquete taller_prediccion y sus pruebas)
 ```
 
 Las decisiones de diseño están en [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
@@ -343,6 +359,7 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 - Endurecer la seguridad: límite de intentos de inicio de sesión, cambio de contraseña, cabeceras, auditoría.
 - Proponer qué puede hacer cada rol y construir el panel de administración, el panel del taller con sus gráficos y las funciones de recepción.
 - Construir las alertas de stock bajo con notificaciones en la aplicación y por correo.
+- Programar el modelo de predicción en Python (`prediccion/`) y sus pruebas, a partir del enfoque que definió el equipo: series de tiempo sobre el historial de consumo, con modelos propios de demanda intermitente.
 - Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.
 - Redactar este README y la documentación en `docs/`.

@@ -160,6 +160,19 @@ Del Sprint 3 ya existen la *Tarea Programada* (`src/tareas/programador.js`, que 
 - **Faltante reportado por el mecánico:** cubre el caso en que el sistema dice que hay stock pero la pieza no aparece o no sirve. Se resuelve cuando entra mercancía.
 - **Preparado para la predicción:** el tipo `QUIEBRE_PROYECTADO` ya existe en la tabla; lo generará el modelo cuando el stock esté sobre el mínimo pero no alcance hasta el próximo pedido.
 
+### ADR-19 · El modelo de predicción: un paquete de Python que es una función pura
+
+- **Contexto (HU-09):** predecir la demanda de repuestos con un modelo de series de tiempo sobre el historial de consumo. El equipo quiere el modelo en Python, que es donde están las herramientas de ciencia de datos.
+- **Decisión:** el modelo vive en `prediccion/` como un paquete (`taller_prediccion`) que recibe un JSON y devuelve otro. No abre la base de datos, no escribe archivos y no usa la red. Su contrato está versionado y documentado en `prediccion/README.md`.
+- **Por qué función pura:** se puede probar con `pytest` sin base de datos ni servidor (184 pruebas), se puede usar desde un cuaderno de Jupyter con los mismos datos, y el SQL sigue viviendo solo en los repositorios de Node.
+- **Un modelo por tipo de demanda.** Los repuestos no se comportan igual: el filtro de aceite sale todas las semanas; la correa de distribución, una vez al mes. Cada serie se clasifica (Syntetos y Boylan: suave, errática, intermitente, irregular) y compiten los modelos que tienen sentido para ese tipo: suavizado exponencial y Holt (`statsmodels`), un modelo estacional mensual, y Croston, SBA y TSB para demanda intermitente.
+- **Elegir por lo que habría acertado, no por lo que explica.** Cada candidato se prueba con origen móvil: se le esconden semanas, pronostica, y se compara con lo que pasó. Hasta 13 orígenes de 4 semanas, que cubren un año, para que un modelo estacional tenga que acertar tanto la temporada alta como la baja. Todos se prueban en las mismas semanas.
+- **RMSSE en lugar de MASE o MAPE.** Con error absoluto, el mejor pronóstico para un repuesto que pasa más semanas quieto que en uso es siempre cero (lo minimiza la mediana). El error cuadrático lo minimiza el promedio, que es lo que necesita el inventario. Se detectó al revisar los primeros resultados: los repuestos de baja rotación salían con pronóstico cero.
+- **Honestidad sobre el resultado.** Junto al pronóstico va cuánto error ahorra frente a "repetir la última semana". Si no le gana, lo dice en un aviso. Un repuesto con historia corta se pronostica con el promedio y también lo advierte.
+- **Del pronóstico a la decisión.** El dueño no necesita una curva, necesita saber cuánto pedir. El modelo calcula stock de seguridad, punto de reorden, cantidad sugerida, días de cobertura y fecha de quiebre, además de la clasificación ABC.
+- **Historial de demostración.** `npm run seed:historial` simula dos años y medio de trabajo con patrones conocidos (tendencia, temporadas, baja rotación, un repuesto descontinuado). Usa los servicios de la aplicación, así que cada unidad pasa por una orden y deja su movimiento; solo las fechas se corrigen después.
+- **Límites conocidos:** no usa variables externas (festivos, precios), modela cada repuesto por separado y el intervalo no se ensancha con el horizonte. Están documentados en `prediccion/README.md`.
+
 ## Requisitos no funcionales cubiertos
 
 | RNF | Cómo se atiende |
@@ -167,6 +180,6 @@ Del Sprint 3 ya existen la *Tarea Programada* (`src/tareas/programador.js`, que 
 | Facilidad de uso | Una sola pantalla, mensajes de error junto a cada campo y textos en lenguaje del taller |
 | Velocidad (< 2 s) | Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
-| Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, más de 200 pruebas (unitarias, integración, aceptación e interfaz) y CI |
+| Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, más de 700 pruebas (unitarias, integración, aceptación, interfaz y del modelo en Python) y CI |
 | Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `panel`, `clientes`, `inventario`, `ordenes`, `alertas`, `notificaciones`) conectados por eventos; el siguiente será `prediccion` |
 | Seguridad | Contraseñas con `scrypt`, sesiones con vencimiento, bloqueo por intentos fallidos, permisos por rol y por propiedad en la API, cabeceras con CSP, auditoría, consultas parametrizadas y ningún secreto en el repositorio (ADR-08, ADR-09, ADR-14) |
