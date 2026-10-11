@@ -130,14 +130,14 @@ npm test                 # todas las pruebas
 npm run test:cobertura   # con reporte de cobertura
 ```
 
-Resultado actual: **216 pruebas en 26 suites, todas en verde.**
+Resultado actual: **273 pruebas en 29 suites, todas en verde.**
 
 | Tipo | Carpeta | Qué verifican |
 |---|---|---|
 | Aceptación | `tests/aceptacion/` | Un archivo por historia, con escenarios Dado/Cuando/Entonces |
-| Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones y respuestas de error |
-| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: tablero Kanban, cambio de estado y lo que ve cada rol |
-| Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros, cambio de estado), reglas de transición, lector de CSV y hash de contraseñas |
+| Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error y seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría) |
+| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", tablero Kanban y cambio de estado |
+| Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros, cambio de estado), reglas de transición, lector de CSV, política y hash de contraseñas, y limitador de intentos |
 
 Cada prueba crea su propia base de datos en memoria y sus propios usuarios (`tests/helpers/contexto.js`), así que las pruebas no dependen unas de otras.
 
@@ -166,7 +166,7 @@ Middleware de sesión y rol (modules/auth)   401 sin sesión, 403 sin permiso
         ▼
 Rutas → Servicios → Repositorios            por módulo: auth, inventario, ordenes
         ▼
-SQLite + migraciones versionadas (src/db/migraciones/001…007)
+SQLite + migraciones versionadas (src/db/migraciones/001…008)
 ```
 
 ```
@@ -177,12 +177,13 @@ src/
 │   ├── connection.js            Aplica las migraciones pendientes al abrir la base
 │   └── migraciones/             001 inventario · 002 usuarios y sesiones · 003 órdenes
 │                                004 repuestos usados · 005 notas · 006 índices
-│                                007 estado de órdenes
+│                                007 estado de órdenes · 008 seguridad de cuentas
 ├── modules/
-│   ├── auth/                    Roles, contraseñas, sesiones, middleware y rutas
+│   ├── auditoria/               Registro de acciones sensibles (quién, qué y cuándo)
+│   ├── auth/                    Roles, contraseñas, sesiones, límite de intentos, middleware y rutas
 │   ├── inventario/              Repuestos, CSV e historial de movimientos
 │   └── ordenes/                 Órdenes, clientes, vehículos, repuestos usados, notas, filtros y estados
-└── shared/                      Errores de dominio y manejador de errores
+└── shared/                      Errores de dominio, manejador de errores y limitador de intentos
 public/
 ├── index.html, styles.css
 └── js/                          api.js (token), comun.js, app.js (enrutador por rol), vistas/
@@ -203,6 +204,8 @@ Todas las rutas, salvo `/api/salud` y `/api/auth/login`, exigen la cabecera `Aut
 | POST | `/api/auth/login` | Público | Inicia sesión: devuelve token, usuario y vista inicial según el rol |
 | POST | `/api/auth/logout` | Con sesión | Cierra la sesión (el token deja de servir) |
 | GET | `/api/auth/yo` | Con sesión | Usuario de la sesión actual |
+| POST | `/api/auth/password` | Con sesión | Cambia la contraseña propia: `{ actual, nueva }`. Cierra las demás sesiones del usuario |
+| POST | `/api/auth/logout-todas` | Con sesión | Cierra la sesión en todos los dispositivos |
 | GET | `/api/repuestos?q=&bajoStock=true` | Con sesión | Catálogo de repuestos |
 | GET | `/api/repuestos/:id` | Con sesión | Un repuesto |
 | POST · PUT · DELETE | `/api/repuestos[/:id]` | Dueño, admin | Crear, editar, dar de baja |
@@ -227,9 +230,27 @@ Todos los errores tienen la misma forma:
 |---|---|
 | 400 | Datos inválidos (`VALIDACION`) |
 | 401 | Sin sesión o sesión vencida (`NO_AUTENTICADO`) |
-| 403 | El rol no tiene permiso (`SIN_PERMISO`) |
+| 403 | El rol no tiene permiso (`SIN_PERMISO`), o hay que cambiar la contraseña temporal antes de seguir (`CAMBIO_DE_PASSWORD_REQUERIDO`) |
 | 404 | No existe (`NO_ENCONTRADO`) |
+| 429 | Demasiados intentos fallidos; la cabecera `Retry-After` dice cuánto esperar (`DEMASIADOS_INTENTOS`) |
 | 409 | Conflicto: SKU repetido, stock insuficiente, orden que ya no está en proceso o cambio de estado que no existe (`CONFLICTO`) |
+
+### Seguridad
+
+| Medida | Cómo funciona |
+|---|---|
+| Contraseñas | Se guardan con `scrypt` y sal aleatoria. Mínimo 8 caracteres, máximo 128; no pueden ser el nombre de usuario |
+| Fuerza bruta | 5 contraseñas incorrectas bloquean ese usuario 15 minutos (responde `429`). Pasa lo mismo si el usuario no existe, así el bloqueo no revela qué usuarios hay. Una misma dirección IP con 30 fallos también queda bloqueada |
+| Sesiones | Token aleatorio de 32 bytes; en la base solo se guarda su hash. Vence a las 8 horas. Cambiar la contraseña cierra las demás sesiones, y desde "Mi cuenta" se pueden cerrar todas |
+| Contraseña temporal | Un usuario marcado para cambiar su contraseña solo puede entrar a cambiarla: el resto de la API responde `403` |
+| Permisos | Por rol en las rutas y por propiedad en los servicios (un mecánico solo toca sus órdenes) |
+| Cabeceras | `helmet` con política de contenido (CSP): solo scripts y estilos propios, sin código en línea. Las respuestas de la API llevan `Cache-Control: no-store` |
+| Auditoría | Tabla `auditoria` con ingresos, intentos fallidos, bloqueos, cambios de contraseña, cambios de estado de órdenes, ajustes de stock, bajas y cargas por CSV |
+| Inyección SQL | Todas las consultas son parametrizadas |
+| Dependencias | `npm audit` en cada push y Dependabot cada semana |
+| Secretos | Ninguno en el repositorio: `.env`, la base de datos y las contraseñas de ejemplo quedan fuera |
+
+**Limitaciones conocidas:** el bloqueo por intentos permite que alguien bloquee a propósito la cuenta de otro durante 15 minutos (se prefiere eso a dejar adivinar contraseñas). La aplicación no cifra el tráfico por sí misma: fuera de la red local debe ir detrás de HTTPS.
 
 ---
 
@@ -270,6 +291,7 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 
 - Proponer la arquitectura por capas y la estructura de carpetas a partir de nuestros diagramas (clases, componentes, C4).
 - Generar el código de las historias HU-01 a HU-07: autenticación y roles, inventario, órdenes, repuestos usados, notas, listado con filtros, cambio de estado con tablero Kanban, migraciones de la base de datos e interfaz web.
+- Endurecer la seguridad: límite de intentos de inicio de sesión, cambio de contraseña, cabeceras, auditoría.
 - Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.
 - Redactar este README y la documentación en `docs/`.

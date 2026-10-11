@@ -102,6 +102,17 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 - **Alternativa descartada:** un navegador real (Playwright). Es más fiel, pero descarga navegadores en cada ejecución del pipeline y hace las pruebas lentas para lo que se quiere comprobar.
 - **Límite conocido:** jsdom no dibuja ni aplica CSS; no detecta problemas visuales. Se fijó en la versión 26 porque las posteriores usan módulos que Jest no carga en Node 22.
 
+### ADR-14 · Seguridad de las cuentas: límite de intentos, contraseña temporal, cabeceras y auditoría
+
+- **Contexto:** el login no tenía límite de intentos, no se podía cambiar la contraseña desde la aplicación y no quedaba registro de quién hacía las acciones delicadas.
+- **Límite de intentos:** 5 fallos seguidos bloquean el usuario 15 minutos. El contador se lleva **por el nombre escrito, exista o no**: si solo se bloquearan los usuarios reales, la respuesta `429` delataría cuáles existen. Para los usuarios reales el bloqueo también se guarda en la base, así sobrevive a un reinicio. Hay un segundo límite por dirección IP (30 fallos) contra quien prueba una contraseña común con muchos usuarios.
+- **Por qué en memoria y sin librería:** el contador es una defensa, no un dato del negocio. `shared/limitador.js` son 50 líneas con reloj inyectable, lo que permite probar el paso de los 15 minutos sin esperar.
+- **Costo aceptado:** alguien puede bloquear a propósito la cuenta de otro. Se prefiere eso a permitir adivinar contraseñas; el administrador puede desbloquear.
+- **Cambio de contraseña:** exige la actual (por si alguien encontró la sesión abierta), tiene su propio límite de intentos y cierra las demás sesiones del usuario.
+- **Contraseña temporal:** el middleware `exigirPasswordPropia` cierra toda la API, salvo `/api/auth`, mientras el usuario no cambie la contraseña que le asignaron. La interfaz lo acompaña, pero la regla está en el servidor.
+- **Cabeceras:** `helmet` con una política de contenido estricta (sin `unsafe-inline`). Una prueba revisa que `index.html` no tenga scripts, estilos ni manejadores en línea, para que la política no se rompa sin darse cuenta. No se fuerza HTTPS porque en el taller la aplicación se abre por HTTP en la red local.
+- **Auditoría:** los servicios reciben el registro de auditoría por parámetro y escriben dentro de la misma transacción de la operación: si la operación se deshace, no queda un rastro falso. Del intento fallido no se guarda el texto escrito como usuario, porque a veces la gente escribe ahí su contraseña.
+
 ## Requisitos no funcionales cubiertos
 
 | RNF | Cómo se atiende |
@@ -111,4 +122,4 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
 | Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, más de 200 pruebas (unitarias, integración, aceptación e interfaz) y CI |
 | Crecimiento a futuro | Módulos por dominio (`auth`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
-| Seguridad | Login con contraseñas cifradas, sesiones con vencimiento, permisos por rol y por propiedad en la API, consultas parametrizadas y ningún secreto en el repositorio |
+| Seguridad | Contraseñas con `scrypt`, sesiones con vencimiento, bloqueo por intentos fallidos, permisos por rol y por propiedad en la API, cabeceras con CSP, auditoría, consultas parametrizadas y ningún secreto en el repositorio (ADR-08, ADR-09, ADR-14) |
