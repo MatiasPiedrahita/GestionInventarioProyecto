@@ -1,9 +1,10 @@
 /* global window, document */
 /**
  * Vista "Órdenes de trabajo".
- * - Mecánico: crea órdenes (quedan a su nombre) y ve solo las suyas.
+ * - Mecánico: crea órdenes (quedan a su nombre), ve solo las suyas y tiene "Mi resumen".
  * - Dueño y administrador: crean órdenes eligiendo el mecánico y ven todas.
- * - Recepcionista: consulta el listado global con filtros (HU-06), sin modificar nada.
+ * - Recepcionista: recibe el vehículo (crea la orden eligiendo el mecánico) y consulta
+ *   el listado global con filtros (HU-06). No registra repuestos, notas ni estados.
  *
  * Las órdenes se ven como lista paginada o como tablero Kanban (HU-07), con
  * una columna por estado. El estado se cambia arrastrando la tarjeta o con
@@ -23,11 +24,13 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
 
   let usuario = null;
 
-  const puedeCrear = () => ['mecanico', 'dueno', 'administrador'].includes(usuario.rol);
+  const puedeCrear = () => ['mecanico', 'recepcionista', 'dueno', 'administrador'].includes(usuario.rol);
   /** Quién registra repuestos, escribe notas y cambia el estado (el mecánico, solo en sus órdenes). */
   const puedeTrabajar = () => ['mecanico', 'dueno', 'administrador'].includes(usuario.rol);
   const puedeReabrir = () => ['dueno', 'administrador'].includes(usuario.rol);
-  const eligeMecanico = () => ['dueno', 'administrador'].includes(usuario.rol);
+  const eligeMecanico = () => ['recepcionista', 'dueno', 'administrador'].includes(usuario.rol);
+  /** Quién puede consultar el directorio de clientes (para completar el formulario con datos ya registrados). */
+  const consultaClientes = () => ['recepcionista', 'dueno', 'administrador'].includes(usuario.rol);
 
   /** Convierte los campos "cliente.nombre" del formulario en { cliente: { nombre } }. */
   function leerFormulario() {
@@ -362,6 +365,7 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
       cambioPendiente = null;
       if (dialogo.open) await abrirDetalle(orden.id);
       await cargar();
+      await cargarMiResumen();
     } catch (error) {
       const sinCampo = dom.marcarErrores(formularioEstado, error.detalles || []);
       dom.aviso(avisoEstado, error.message, 'error', sinCampo);
@@ -594,6 +598,78 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
     }
   });
 
+  // ----------------------------------------------- Mi resumen (mecánico)
+  function tarjetaDeResumen(titulo, valor, nota) {
+    const tarjeta = dom.crear('div', { clase: 'indicador' });
+    tarjeta.appendChild(dom.crear('p', { clase: 'indicador__titulo', texto: titulo }));
+    tarjeta.appendChild(dom.crear('p', { clase: 'indicador__valor', texto: valor }));
+    if (nota) tarjeta.appendChild(dom.crear('p', { clase: 'indicador__nota', texto: nota }));
+    return tarjeta;
+  }
+
+  async function cargarMiResumen() {
+    const franja = $('#franja-mi-resumen');
+    franja.hidden = usuario.rol !== 'mecanico';
+    if (franja.hidden) return;
+    try {
+      const r = await api.pedir('/api/ordenes/mi-resumen');
+      let antigua = 'Sin órdenes abiertas';
+      if (r.diasDeLaMasAntigua !== null) {
+        antigua = r.diasDeLaMasAntigua === 0 ? 'La más antigua es de hoy' : `La más antigua lleva ${r.diasDeLaMasAntigua} ${r.diasDeLaMasAntigua === 1 ? 'día' : 'días'}`;
+      }
+      $('#mi-resumen').replaceChildren(
+        tarjetaDeResumen('Mis órdenes en proceso', String(r.enProceso), antigua),
+        tarjetaDeResumen('Finalizadas', String(r.finalizadas), `En los últimos ${r.dias} días`),
+        tarjetaDeResumen('Repuestos que usé', String(r.repuestosUsados), `Unidades, últimos ${r.dias} días`),
+      );
+    } catch {
+      franja.hidden = true;
+    }
+  }
+
+  // ------------------------------- Completar con datos ya registrados (recepción)
+  const pistaCliente = $('#pista-cliente');
+  const pistaVehiculo = $('#pista-vehiculo');
+  const campo = (nombre) => formulario.elements[nombre];
+
+  /** Solo rellena lo que está vacío: nunca pisa lo que la persona ya escribió. */
+  function completar(valores) {
+    Object.entries(valores).forEach(([nombre, valor]) => {
+      if (valor !== null && valor !== undefined && campo(nombre).value.trim() === '') campo(nombre).value = valor;
+    });
+  }
+
+  campo('cliente.documento').addEventListener('change', async () => {
+    pistaCliente.textContent = '';
+    const documento = campo('cliente.documento').value.trim();
+    if (!consultaClientes() || documento === '') return;
+    try {
+      const { datos } = await api.pedir(`/api/clientes?${new URLSearchParams({ documento })}`);
+      if (datos.length === 0) return;
+      const [cliente] = datos;
+      completar({ 'cliente.nombre': cliente.nombre, 'cliente.telefono': cliente.telefono, 'cliente.email': cliente.email });
+      pistaCliente.textContent = `Cliente registrado: ${cliente.nombre}, con ${cliente.ordenes} ${cliente.ordenes === 1 ? 'orden anterior' : 'órdenes anteriores'}.`;
+    } catch { /* sin datos previos: se llena a mano */ }
+  });
+
+  campo('vehiculo.placa').addEventListener('change', async () => {
+    pistaVehiculo.textContent = '';
+    const placa = campo('vehiculo.placa').value.trim();
+    if (!consultaClientes() || placa === '') return;
+    try {
+      const { vehiculo, cliente, ordenes } = await api.pedir(`/api/vehiculos/${encodeURIComponent(placa)}`);
+      completar({ 'vehiculo.marca': vehiculo.marca, 'vehiculo.modelo': vehiculo.modelo, 'vehiculo.anio': vehiculo.anio });
+      const abiertas = ordenes.filter((o) => o.estado === 'EN_PROCESO').length;
+      pistaVehiculo.textContent = `Vehículo registrado a nombre de ${cliente.nombre}: ${ordenes.length} ${ordenes.length === 1 ? 'orden anterior' : 'órdenes anteriores'}`
+        + `${abiertas > 0 ? `, ${abiertas} todavía en proceso` : ''}.`;
+    } catch { /* placa nueva o incompleta: se llena a mano */ }
+  });
+
+  formulario.addEventListener('reset', () => {
+    pistaCliente.textContent = '';
+    pistaVehiculo.textContent = '';
+  });
+
   // ------------------------------------------------------------ Nueva orden
   formulario.addEventListener('submit', async (evento) => {
     evento.preventDefault();
@@ -605,6 +681,7 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
       dom.aviso(aviso, `Orden #${orden.id} creada para ${orden.vehiculo.placa}. Quedó en estado ${orden.estadoNombre}.`, 'ok');
       pagina = 1;
       await cargar();
+      await cargarMiResumen();
     } catch (error) {
       const sinCampo = dom.marcarErrores(formulario, error.detalles || []);
       dom.aviso(aviso, error.message, 'error', sinCampo);
@@ -629,6 +706,7 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
       let guardado = null;
       try { guardado = window.sessionStorage.getItem(CLAVE_MODO); } catch { /* almacenamiento no disponible */ }
       aplicarModo(guardado || (esMecanico ? 'tablero' : 'lista'));
+      await cargarMiResumen();
       pagina = 1;
       await cargar();
     },

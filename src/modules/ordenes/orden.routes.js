@@ -14,7 +14,7 @@ function leerId(req) {
  * @param {object} servicio Servicio de órdenes.
  * @param {{ puedenCrear: Function, puedenTrabajar: Function, puedenReasignar: Function }} permisos Middlewares de autorización por rol.
  */
-function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar, puedenReasignar }) {
+function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar, puedenReasignar, soloMecanicos }) {
   const router = express.Router();
 
   router.get('/', (req, res) => {
@@ -24,6 +24,11 @@ function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar, puedenReasig
   router.post('/', puedenCrear, (req, res) => {
     const orden = servicio.crear(req.body, req.usuario);
     res.status(201).location(`/api/ordenes/${orden.id}`).json(orden);
+  });
+
+  // Va antes de "/:id" para que "mi-resumen" no se tome como un id.
+  router.get('/mi-resumen', soloMecanicos, (req, res) => {
+    res.json(servicio.resumenPropio(req.usuario));
   });
 
   router.get('/:id', (req, res) => {

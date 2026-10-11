@@ -9,15 +9,17 @@ const { SIN_AUDITORIA } = require('../auditoria/auditoria.service');
 const { ErrorDeValidacion, NoEncontrado, SinPermiso, Conflicto } = require('../../shared/errors');
 
 const LIMITE_NOTAS = 4000;
+const DIAS_DEL_RESUMEN = 30;
+const DIA_MS = 24 * 3600 * 1000;
 
 /**
  * Lógica de las órdenes de trabajo.
  * @param {object} repositorio Repositorio de órdenes.
  * @param {object} usuarios Repositorio de usuarios (para validar el mecánico asignado).
  * @param {object} repuestos Repositorio de repuestos (para descontar stock).
- * @param {{ auditoria?: object }} opciones
+ * @param {{ auditoria?: object, ahora?: () => Date }} opciones
  */
-function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SIN_AUDITORIA } = {}) {
+function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SIN_AUDITORIA, ahora = () => new Date() } = {}) {
   /** Un mecánico solo ve y trabaja sus propias órdenes; los demás roles ven todas. */
   function verificarAcceso(orden, usuario) {
     if (usuario.rol === ROLES.MECANICO && orden.mecanico.id !== usuario.id) {
@@ -246,6 +248,17 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SI
         });
       });
       return this.obtener(id, usuario);
+    },
+
+    /** "Mi resumen" del mecánico: su carga de hoy y lo que cerró en los últimos 30 días. */
+    resumenPropio(usuario) {
+      const momento = ahora();
+      const desde = new Date(momento.getTime() - DIAS_DEL_RESUMEN * DIA_MS).toISOString().slice(0, 19).replace('T', ' ');
+      const { enProceso, masAntiguaDesde, finalizadas, repuestosUsados } = repositorio.resumenDeMecanico(usuario.id, desde);
+      const diasDeLaMasAntigua = masAntiguaDesde
+        ? Math.max(0, Math.floor((momento.getTime() - Date.parse(`${masAntiguaDesde.replace(' ', 'T')}Z`)) / DIA_MS))
+        : null;
+      return { enProceso, finalizadas, repuestosUsados, diasDeLaMasAntigua, dias: DIAS_DEL_RESUMEN };
     },
 
     /** Historial de cambios de estado de la orden, del más antiguo al más reciente. */

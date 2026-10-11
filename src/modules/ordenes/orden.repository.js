@@ -106,6 +106,19 @@ function crearRepositorioOrdenes(db) {
        WHERE h.orden_id = ?
        ORDER BY h.id
     `),
+    // Lo que un mecánico quiere saber de su propio trabajo, en una sola consulta.
+    resumenDeMecanico: db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM ordenes WHERE mecanico_id = @id AND estado = 'EN_PROCESO') AS enProceso,
+        (SELECT MIN(creado_en) FROM ordenes WHERE mecanico_id = @id AND estado = 'EN_PROCESO') AS masAntiguaDesde,
+        (SELECT COUNT(*) FROM ordenes o
+          WHERE o.mecanico_id = @id AND o.estado = 'FINALIZADA'
+            AND (SELECT MAX(h.fecha) FROM historial_estados_orden h
+                  WHERE h.orden_id = o.id AND h.estado_nuevo = 'FINALIZADA') >= @desde) AS finalizadas,
+        (SELECT COALESCE(SUM(d.cantidad), 0) FROM detalle_repuestos d
+           JOIN ordenes o ON o.id = d.orden_id
+          WHERE o.mecanico_id = @id AND d.devuelto = 0 AND d.creado_en >= @desde) AS repuestosUsados
+    `),
     cambiarMecanico: db.prepare("UPDATE ordenes SET mecanico_id = @mecanicoId, actualizado_en = datetime('now') WHERE id = @id"),
     enProcesoDeMecanico: db.prepare("SELECT COUNT(*) AS n FROM ordenes WHERE mecanico_id = ? AND estado = 'EN_PROCESO'"),
     marcarDevueltos: db.prepare('UPDATE detalle_repuestos SET devuelto = 1 WHERE orden_id = ? AND devuelto = 0'),
@@ -231,6 +244,9 @@ function crearRepositorioOrdenes(db) {
         usuario: fila.usuario,
         fecha: fila.fecha,
       }));
+    },
+    resumenDeMecanico(id, desde) {
+      return { ...sentencias.resumenDeMecanico.get({ id, desde }) };
     },
     cambiarMecanico(id, mecanicoId) {
       sentencias.cambiarMecanico.run({ id, mecanicoId });

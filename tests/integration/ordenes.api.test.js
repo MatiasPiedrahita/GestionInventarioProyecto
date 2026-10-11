@@ -58,9 +58,33 @@ describe('API /api/ordenes (integración)', () => {
     expect(correcta.body.mecanico).toEqual({ id: mecanico.id, nombre: mecanico.nombre });
   });
 
-  test('la recepcionista no puede crear órdenes (403)', async () => {
-    const res = await ctx.como('recepcionista').post('/api/ordenes').send(ordenValida());
-    expect(res.status).toBe(403);
+  test('la recepcionista recibe el vehículo: crea la orden eligiendo un mecánico activo', async () => {
+    const recepcion = ctx.como('recepcionista');
+    const mecanico = ctx.usuario('mecanico');
+
+    const sinMecanico = await recepcion.post('/api/ordenes').send(ordenValida());
+    const creada = await recepcion.post('/api/ordenes').send(ordenValida({ mecanicoId: mecanico.id }));
+
+    expect(sinMecanico.status).toBe(400);
+    expect(sinMecanico.body.detalles).toEqual([{ campo: 'mecanicoId', mensaje: 'Selecciona el mecánico que atenderá la orden' }]);
+    expect(creada.status).toBe(201);
+    expect(creada.body.mecanico).toEqual({ id: mecanico.id, nombre: mecanico.nombre });
+    expect(ctx.db.prepare('SELECT creado_por FROM ordenes WHERE id = ?').get(creada.body.id).creado_por).toBe(ctx.usuario('recepcionista').id);
+  });
+
+  test('la recepcionista crea la orden pero no trabaja en ella: sin repuestos, notas, estados ni reasignación (403)', async () => {
+    const recepcion = ctx.como('recepcionista');
+    const { body: orden } = await recepcion.post('/api/ordenes').send(ordenValida({ mecanicoId: ctx.usuario('mecanico').id }));
+
+    const respuestas = await Promise.all([
+      recepcion.post(`/api/ordenes/${orden.id}/repuestos`).send({ items: [{ repuestoId: 1, cantidad: 1 }] }),
+      recepcion.patch(`/api/ordenes/${orden.id}/notas`).send({ notas: 'x' }),
+      recepcion.patch(`/api/ordenes/${orden.id}/estado`).send({ estado: 'FINALIZADA' }),
+      recepcion.patch(`/api/ordenes/${orden.id}/mecanico`).send({ mecanicoId: 1 }),
+    ]);
+
+    expect(respuestas.map((r) => r.status)).toEqual([403, 403, 403, 403]);
+    expect((await recepcion.get(`/api/ordenes/${orden.id}`)).body.estado).toBe('EN_PROCESO');
   });
 
   test('cada mecánico ve solo sus órdenes; el dueño ve todas', async () => {
