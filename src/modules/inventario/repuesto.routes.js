@@ -15,8 +15,8 @@ function leerId(req) {
  *
  * Permisos: cualquier usuario con sesión puede CONSULTAR el catálogo (el
  * mecánico lo necesita para registrar repuestos usados); crear, editar,
- * dar de baja, importar y ver el historial es solo para quien gestiona el
- * inventario (dueño y administrador).
+ * dar de baja, importar, registrar entradas de mercancía y ver el historial
+ * es solo para quien gestiona el inventario (dueño y administrador).
  *
  * @param {object} servicio Servicio de inventario.
  * @param {{ soloGestion?: Function }} permisos Middleware que restringe la gestión.
@@ -41,6 +41,10 @@ function crearRutasInventario(servicio, { soloGestion = (req, res, next) => next
 
   router.get('/:id/movimientos', soloGestion, (req, res) => {
     res.json(servicio.historial(leerId(req)));
+  });
+
+  router.post('/:id/entradas', soloGestion, (req, res) => {
+    res.status(201).json(servicio.registrarEntrada(leerId(req), req.body, req.usuario));
   });
 
   router.post('/', soloGestion, (req, res) => {

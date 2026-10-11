@@ -1,4 +1,5 @@
 const { validarRepuesto } = require('./repuesto.validator');
+const { validarEntrada } = require('./entrada.validator');
 const { parsearCsv } = require('./csv');
 const { ACCIONES } = require('../auditoria/acciones');
 const { SIN_AUDITORIA } = require('../auditoria/auditoria.service');
@@ -106,6 +107,37 @@ function crearServicioInventario(repositorio, { auditoria = SIN_AUDITORIA } = {}
           entidadId: id,
           detalle: `${repuesto.sku} (${repuesto.nombre}), con ${repuesto.stockActual} unidades`,
         });
+      });
+    },
+
+    /**
+     * Entrada de mercancía: suma al stock las unidades que llegaron del
+     * proveedor y deja el movimiento ENTRADA en el historial. A diferencia
+     * del ajuste manual, no hay que calcular el stock final a mano.
+     */
+    registrarEntrada(id, entrada, usuario) {
+      const repuesto = exigirExistente(id);
+      const resultado = validarEntrada(entrada);
+      if (!resultado.valido) throw new ErrorDeValidacion(resultado.errores);
+      const { cantidad, detalle } = resultado.valor;
+
+      return repositorio.enTransaccion(() => {
+        const stockResultante = repositorio.sumarStock(id, cantidad);
+        repositorio.registrarMovimiento({
+          repuestoId: id,
+          tipo: 'ENTRADA',
+          cantidad,
+          stockResultante,
+          detalle: detalle || 'Entrada de mercancía',
+        });
+        auditoria.registrar({
+          usuarioId: idDe(usuario),
+          accion: ACCIONES.REPUESTO_ENTRADA,
+          entidad: 'repuesto',
+          entidadId: id,
+          detalle: `${repuesto.sku}: +${cantidad} (de ${repuesto.stockActual} a ${stockResultante})`,
+        });
+        return repositorio.buscarPorId(id);
       });
     },
 

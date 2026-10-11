@@ -12,9 +12,9 @@ function leerId(req) {
 /**
  * Endpoints de órdenes de trabajo.
  * @param {object} servicio Servicio de órdenes.
- * @param {{ puedenCrear: Function, puedenTrabajar: Function }} permisos Middlewares de autorización por rol.
+ * @param {{ puedenCrear: Function, puedenTrabajar: Function, puedenReasignar: Function }} permisos Middlewares de autorización por rol.
  */
-function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar }) {
+function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar, puedenReasignar }) {
   const router = express.Router();
 
   router.get('/', (req, res) => {
@@ -40,6 +40,10 @@ function crearRutasOrdenes(servicio, { puedenCrear, puedenTrabajar }) {
 
   router.patch('/:id/estado', puedenTrabajar, (req, res) => {
     res.json(servicio.cambiarEstado(leerId(req), req.body, req.usuario));
+  });
+
+  router.patch('/:id/mecanico', puedenReasignar, (req, res) => {
+    res.json(servicio.reasignarMecanico(leerId(req), req.body, req.usuario));
   });
 
   router.get('/:id/historial', (req, res) => {

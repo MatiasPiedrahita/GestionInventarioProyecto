@@ -214,6 +214,40 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SI
       return this.obtener(id, usuario);
     },
 
+    /**
+     * Pasa una orden en proceso a otro mecánico (por ejemplo, si el asignado
+     * se enferma o sale del taller). Lo decide quien administra, no el mecánico.
+     */
+    reasignarMecanico(id, entrada, usuario) {
+      const orden = this.obtener(id, usuario);
+      if (orden.estado !== ESTADOS.EN_PROCESO) {
+        throw new Conflicto(`La orden #${id} está ${orden.estadoNombre.toLowerCase()}; solo se reasignan órdenes en proceso`);
+      }
+      const pedido = Number(entrada && entrada.mecanicoId);
+      if (!Number.isInteger(pedido) || pedido <= 0) {
+        throw new ErrorDeValidacion([{ campo: 'mecanicoId', mensaje: 'Selecciona el mecánico que recibe la orden' }]);
+      }
+      const destino = usuarios.buscarPorId(pedido);
+      if (!destino || destino.rol !== ROLES.MECANICO || !destino.activo) {
+        throw new ErrorDeValidacion([{ campo: 'mecanicoId', mensaje: 'El usuario seleccionado no es un mecánico activo' }]);
+      }
+      if (destino.id === orden.mecanico.id) {
+        throw new Conflicto(`La orden #${id} ya está asignada a ${destino.nombre}`);
+      }
+
+      repositorio.enTransaccion(() => {
+        repositorio.cambiarMecanico(id, destino.id);
+        auditoria.registrar({
+          usuarioId: usuario.id,
+          accion: ACCIONES.ORDEN_REASIGNADA,
+          entidad: 'orden',
+          entidadId: id,
+          detalle: `De ${orden.mecanico.nombre} a ${destino.nombre}`,
+        });
+      });
+      return this.obtener(id, usuario);
+    },
+
     /** Historial de cambios de estado de la orden, del más antiguo al más reciente. */
     historialDeEstados(id, usuario) {
       this.obtener(id, usuario);
