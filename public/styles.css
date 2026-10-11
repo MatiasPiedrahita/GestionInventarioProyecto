@@ -513,3 +513,13 @@ tr.devuelto td.num { text-decoration: line-through; }
   .tablero { grid-template-columns: 1fr; }
   .tablero__columna { min-height: 0; }
 }
+
+/* ===================== Mi cuenta ===================== */
+.disposicion--cuenta { grid-template-columns: minmax(280px, 420px) minmax(240px, 360px); }
+.disposicion--cuenta .panel h2 { margin-bottom: 0.75rem; }
+.barra-app__usuario a.boton--texto { color: #c9d6e3; text-decoration: none; }
+.barra-app__usuario a.boton--texto:hover { color: #fff; text-decoration: underline; }
+
+@media (max-width: 860px) {
+  .disposicion--cuenta { grid-template-columns: 1fr; }
+}

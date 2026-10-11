@@ -35,9 +35,55 @@
       <nav id="menu" class="barra-app__menu" aria-label="Secciones"></nav>
       <div class="barra-app__usuario">
         <span><strong id="nombre-usuario"></strong> <span id="rol-usuario" class="etiqueta-rol"></span></span>
+        <a href="#cuenta" class="boton boton--texto" id="enlace-cuenta">Mi cuenta</a>
         <button type="button" class="boton boton--texto" id="boton-salir">Cerrar sesión</button>
       </div>
     </header>
+
+    <!-- Vista: mi cuenta (todos los roles) -->
+    <section class="vista" data-vista="cuenta" hidden>
+      <header class="cabecera">
+        <div>
+          <h1>Mi cuenta</h1>
+          <p class="resumen" id="resumen-cuenta"></p>
+        </div>
+      </header>
+
+      <div class="disposicion disposicion--cuenta">
+        <section class="panel" aria-labelledby="titulo-password">
+          <h2 id="titulo-password">Cambiar contraseña</h2>
+          <p class="aviso aviso--error" id="aviso-password-temporal" hidden>
+            Entraste con una contraseña temporal. Cámbiala por una que solo tú conozcas para poder usar el sistema.
+          </p>
+          <form id="formulario-password" novalidate>
+            <div class="campo">
+              <label for="password-actual">Contraseña actual</label>
+              <input id="password-actual" name="actual" type="password" autocomplete="current-password" required>
+              <p class="campo__error" data-error="actual"></p>
+            </div>
+            <div class="campo">
+              <label for="password-nueva">Contraseña nueva</label>
+              <input id="password-nueva" name="nueva" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+              <p class="campo__error" data-error="nueva"></p>
+            </div>
+            <div class="campo">
+              <label for="password-confirmar">Repite la contraseña nueva</label>
+              <input id="password-confirmar" name="confirmar" type="password" autocomplete="new-password" maxlength="128" required>
+              <p class="campo__error" data-error="confirmar"></p>
+            </div>
+            <p class="detalle">Mínimo 8 caracteres. No puede ser igual a tu nombre de usuario.</p>
+            <p class="aviso" id="aviso-password" role="status"></p>
+            <button type="submit" class="boton">Cambiar contraseña</button>
+          </form>
+        </section>
+
+        <section class="panel" aria-labelledby="titulo-sesiones">
+          <h2 id="titulo-sesiones">Sesiones abiertas</h2>
+          <p>Si dejaste la sesión abierta en otro computador del taller, ciérrala desde aquí. Tendrás que volver a iniciar sesión.</p>
+          <button type="button" class="boton boton--secundario" id="boton-cerrar-todas">Cerrar sesión en todos los dispositivos</button>
+        </section>
+      </div>
+    </section>
 
     <!-- Vista: órdenes de trabajo -->
     <section class="vista" data-vista="ordenes" hidden>
@@ -398,6 +444,7 @@
   <script src="js/comun.js"></script>
   <script src="js/vistas/inventario.js"></script>
   <script src="js/vistas/ordenes.js"></script>
+  <script src="js/vistas/cuenta.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
