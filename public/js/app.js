@@ -11,10 +11,13 @@
   const { api, dom, vistas } = window.Taller;
   const $ = (selector) => document.querySelector(selector);
 
-  /** Qué roles ven cada vista del menú (en orden de aparición). */
+  const TODOS = ['mecanico', 'recepcionista', 'dueno', 'administrador'];
+
+  /** Qué roles ven cada vista (en orden de aparición). enMenu: false la deja fuera de la barra de secciones. */
   const MENU = [
-    { vista: 'ordenes', etiqueta: 'Órdenes de trabajo', roles: ['mecanico', 'recepcionista', 'dueno', 'administrador'] },
+    { vista: 'ordenes', etiqueta: 'Órdenes de trabajo', roles: TODOS },
     { vista: 'inventario', etiqueta: 'Inventario', roles: ['dueno', 'administrador'] },
+    { vista: 'cuenta', etiqueta: 'Mi cuenta', roles: TODOS, enMenu: false },
   ];
 
   let usuarioActual = null;
@@ -32,7 +35,8 @@
 
   function mostrarVista(nombre) {
     const permitidas = vistasPermitidas().map((item) => item.vista);
-    const destino = permitidas.includes(nombre) ? nombre : vistaInicial;
+    // Con contraseña temporal no hay otra pantalla que la de cambiarla (la API también lo exige).
+    const destino = usuarioActual.debeCambiarPassword ? 'cuenta' : (permitidas.includes(nombre) ? nombre : vistaInicial);
 
     document.querySelectorAll('.vista').forEach((seccion) => {
       seccion.hidden = seccion.dataset.vista !== destino;
@@ -47,7 +51,8 @@
 
   function construirMenu() {
     menu.replaceChildren();
-    vistasPermitidas().forEach((item) => {
+    if (usuarioActual.debeCambiarPassword) return;
+    vistasPermitidas().filter((item) => item.enMenu !== false).forEach((item) => {
       const enlace = dom.crear('a', { texto: item.etiqueta });
       enlace.href = `#${item.vista}`;
       enlace.dataset.vista = item.vista;
@@ -105,6 +110,18 @@
   });
 
   api.alPerderSesion((mensaje) => salir(mensaje || 'Tu sesión terminó. Inicia sesión de nuevo.'));
+
+  document.addEventListener('taller:sesion-cerrada', () => salir());
+
+  // Al cambiar la contraseña temporal se desbloquea el resto de la aplicación.
+  document.addEventListener('taller:password-cambiada', (evento) => {
+    const estabaBloqueado = usuarioActual.debeCambiarPassword;
+    usuarioActual = evento.detail;
+    if (estabaBloqueado) {
+      construirMenu();
+      mostrarVista(vistaInicial);
+    }
+  });
 
   // Si ya había una sesión en esta pestaña, se retoma sin pedir login.
   (async function retomarSesion() {

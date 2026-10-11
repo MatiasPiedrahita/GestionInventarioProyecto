@@ -4,6 +4,8 @@ const { validarFiltros } = require('./filtros.validator');
 const { validarCambioDeEstado } = require('./estado.validator');
 const { ESTADOS, NOMBRE_ESTADO, evaluarTransicion } = require('./estados');
 const { ROLES } = require('../auth/roles');
+const { ACCIONES } = require('../auditoria/acciones');
+const { SIN_AUDITORIA } = require('../auditoria/auditoria.service');
 const { ErrorDeValidacion, NoEncontrado, SinPermiso, Conflicto } = require('../../shared/errors');
 
 const LIMITE_NOTAS = 4000;
@@ -13,8 +15,9 @@ const LIMITE_NOTAS = 4000;
  * @param {object} repositorio Repositorio de órdenes.
  * @param {object} usuarios Repositorio de usuarios (para validar el mecánico asignado).
  * @param {object} repuestos Repositorio de repuestos (para descontar stock).
+ * @param {{ auditoria?: object }} opciones
  */
-function crearServicioOrdenes(repositorio, usuarios, repuestos) {
+function crearServicioOrdenes(repositorio, usuarios, repuestos, { auditoria = SIN_AUDITORIA } = {}) {
   /** Un mecánico solo ve y trabaja sus propias órdenes; los demás roles ven todas. */
   function verificarAcceso(orden, usuario) {
     if (usuario.rol === ROLES.MECANICO && orden.mecanico.id !== usuario.id) {
@@ -198,6 +201,14 @@ function crearServicioOrdenes(repositorio, usuarios, repuestos) {
           });
           repositorio.marcarRepuestosDevueltos(id);
         }
+
+        auditoria.registrar({
+          usuarioId: usuario.id,
+          accion: ACCIONES.ORDEN_ESTADO,
+          entidad: 'orden',
+          entidadId: id,
+          detalle: `${orden.estadoNombre} → ${NOMBRE_ESTADO[estado]}${motivo ? `: ${motivo}` : ''}`,
+        });
       });
 
       return this.obtener(id, usuario);

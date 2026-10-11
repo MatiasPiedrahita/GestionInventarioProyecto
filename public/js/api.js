@@ -36,6 +36,7 @@ window.Taller.api = (function crearApi() {
     if (!respuesta.ok) {
       const error = new Error(cuerpo.mensaje || `Error ${respuesta.status}`);
       error.status = respuesta.status;
+      error.codigo = cuerpo.error;
       error.detalles = cuerpo.detalles || [];
       throw error;
     }

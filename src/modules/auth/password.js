@@ -23,4 +23,25 @@ function verificarPassword(password, guardado) {
   return crypto.timingSafeEqual(esperado, calculado);
 }
 
-module.exports = { hashearPassword, verificarPassword };
+const LONGITUD_MINIMA = 8;
+// El máximo evita que alguien envíe textos enormes para ocupar el servidor calculando hashes.
+const LONGITUD_MAXIMA = 128;
+
+/**
+ * Política de contraseñas (función pura).
+ * @returns {string|null} El motivo del rechazo, o null si la contraseña sirve.
+ */
+function problemaDePassword(password, { usuario = '' } = {}) {
+  if (typeof password !== 'string' || password.length < LONGITUD_MINIMA) {
+    return `La contraseña debe tener al menos ${LONGITUD_MINIMA} caracteres`;
+  }
+  if (password.length > LONGITUD_MAXIMA) return `La contraseña admite máximo ${LONGITUD_MAXIMA} caracteres`;
+  if (password.trim() === '') return 'La contraseña no puede ser solo espacios';
+  if (usuario && password.toLowerCase() === String(usuario).toLowerCase()) {
+    return 'La contraseña no puede ser igual al nombre de usuario';
+  }
+  if (new Set(password).size === 1) return 'La contraseña no puede repetir un solo carácter';
+  return null;
+}
+
+module.exports = { hashearPassword, verificarPassword, problemaDePassword, LONGITUD_MINIMA, LONGITUD_MAXIMA };

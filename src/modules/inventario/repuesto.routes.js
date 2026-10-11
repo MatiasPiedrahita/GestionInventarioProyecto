@@ -31,7 +31,7 @@ function crearRutasInventario(servicio, { soloGestion = (req, res, next) => next
   });
 
   router.post('/importar', soloGestion, express.text({ type: ['text/csv', 'text/plain'], limit: '1mb' }), (req, res) => {
-    const resultado = servicio.importarCsv(typeof req.body === 'string' ? req.body : '');
+    const resultado = servicio.importarCsv(typeof req.body === 'string' ? req.body : '', req.usuario);
     res.status(201).json(resultado);
   });
 
@@ -49,11 +49,11 @@ function crearRutasInventario(servicio, { soloGestion = (req, res, next) => next
   });
 
   router.put('/:id', soloGestion, (req, res) => {
-    res.json(servicio.actualizar(leerId(req), req.body));
+    res.json(servicio.actualizar(leerId(req), req.body, req.usuario));
   });
 
   router.delete('/:id', soloGestion, (req, res) => {
-    servicio.darDeBaja(leerId(req));
+    servicio.darDeBaja(leerId(req), req.usuario);
     res.status(204).end();
   });
 

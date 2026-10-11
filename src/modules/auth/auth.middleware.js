@@ -1,4 +1,4 @@
-const { NoAutenticado, SinPermiso } = require('../../shared/errors');
+const { NoAutenticado, SinPermiso, CambioDePasswordRequerido } = require('../../shared/errors');
 
 function leerToken(req) {
   const cabecera = req.get('authorization') || '';
@@ -26,4 +26,13 @@ function autorizar(...roles) {
   };
 }
 
-module.exports = { crearAutenticacion, autorizar, leerToken };
+/**
+ * Con una contraseña temporal solo se puede entrar a cambiarla: el resto de
+ * la API queda cerrado hasta que el usuario ponga la suya.
+ */
+function exigirPasswordPropia(req, res, next) {
+  if (req.usuario && req.usuario.debeCambiarPassword) return next(new CambioDePasswordRequerido());
+  return next();
+}
+
+module.exports = { crearAutenticacion, autorizar, exigirPasswordPropia, leerToken };

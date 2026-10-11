@@ -16,9 +16,9 @@ describe('Interfaz · tablero Kanban y cambio de estado (HU-07)', () => {
     nav = await abrirNavegador(ctx.app);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await nav.cerrar();
     expect(nav.errores).toEqual([]);
-    nav.cerrar();
   });
 
   const tarjetasDe = (estado) => nav.$$(`[data-tarjetas="${estado}"] .tarjeta`);
