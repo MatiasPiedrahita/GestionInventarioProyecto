@@ -36,6 +36,11 @@ async function abrirNavegador(app, { hash = '' } = {}) {
     };
   }
 
+  // jsdom tampoco muestra los diálogos del navegador: se acepta por defecto y cada
+  // prueba puede cambiar la respuesta con nav.window.confirm = () => false.
+  window.confirm = () => true;
+  window.alert = () => {};
+
   const peticiones = [];
   let enCurso = 0;
   window.fetch = async (url, opciones = {}) => {

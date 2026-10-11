@@ -40,6 +40,142 @@
       </div>
     </header>
 
+    <!-- Vista: administración (dueño y administrador) -->
+    <section class="vista" data-vista="administracion" hidden>
+      <header class="cabecera">
+        <div>
+          <h1>Administración</h1>
+          <p class="resumen" id="resumen-administracion" aria-live="polite"></p>
+        </div>
+      </header>
+
+      <div class="contenedor">
+        <div class="pestanas" id="pestanas-administracion" role="tablist" aria-label="Secciones de administración">
+          <button type="button" class="pestana" role="tab" id="pestana-usuarios" data-pestana="usuarios" aria-controls="panel-usuarios" aria-selected="true">Usuarios</button>
+          <button type="button" class="pestana" role="tab" id="pestana-auditoria" data-pestana="auditoria" aria-controls="panel-auditoria" aria-selected="false">Auditoría</button>
+          <button type="button" class="pestana" role="tab" id="pestana-sistema" data-pestana="sistema" aria-controls="panel-sistema" aria-selected="false">Sistema</button>
+        </div>
+
+        <div class="disposicion disposicion--interna" id="panel-usuarios" role="tabpanel" aria-labelledby="pestana-usuarios">
+          <section class="panel panel--formulario" aria-labelledby="titulo-formulario-usuario">
+            <h2 id="titulo-formulario-usuario">Nuevo usuario</h2>
+            <form id="formulario-usuario" novalidate>
+              <input type="hidden" name="id">
+              <div class="campo">
+                <label for="usuario-usuario">Usuario</label>
+                <input id="usuario-usuario" name="usuario" autocomplete="off" autocapitalize="none" placeholder="mecanico3" required>
+                <p class="campo__error" data-error="usuario"></p>
+              </div>
+              <div class="campo">
+                <label for="usuario-nombre">Nombre completo</label>
+                <input id="usuario-nombre" name="nombre" autocomplete="off" maxlength="80" required>
+                <p class="campo__error" data-error="nombre"></p>
+              </div>
+              <div class="campo">
+                <label for="usuario-rol">Rol</label>
+                <select id="usuario-rol" name="rol" required></select>
+                <p class="campo__error" data-error="rol"></p>
+              </div>
+              <div class="campo">
+                <label for="usuario-email">Correo <span class="opcional">(opcional)</span></label>
+                <input id="usuario-email" name="email" type="email" autocomplete="off" maxlength="120">
+                <p class="campo__error" data-error="email"></p>
+              </div>
+              <p class="detalle" id="ayuda-usuario">El sistema genera una contraseña temporal. El usuario deberá cambiarla al entrar.</p>
+              <p class="aviso" id="aviso-usuario" role="status"></p>
+              <div class="acciones">
+                <button type="submit" class="boton" id="boton-guardar-usuario">Crear usuario</button>
+                <button type="button" class="boton boton--texto" id="boton-cancelar-usuario" hidden>Cancelar edición</button>
+              </div>
+            </form>
+
+            <div class="credencial" id="credencial-temporal" role="alert" hidden>
+              <p><strong>Contraseña temporal de <span id="credencial-usuario"></span></strong></p>
+              <p class="credencial__valor" id="credencial-valor"></p>
+              <p class="detalle">Entrégasela en persona. No se vuelve a mostrar, y al entrar tendrá que cambiarla.</p>
+              <button type="button" class="boton boton--secundario boton--chico" id="boton-ocultar-credencial">Ya la anoté</button>
+            </div>
+          </section>
+
+          <section class="panel panel--tabla" aria-labelledby="titulo-tabla-usuarios">
+            <div class="barra">
+              <h2 id="titulo-tabla-usuarios">Usuarios</h2>
+            </div>
+            <p class="aviso" id="aviso-usuarios" role="status"></p>
+            <div class="tabla-contenedor">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Usuario</th>
+                    <th scope="col" class="col-nombre">Nombre</th>
+                    <th scope="col">Rol</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col" class="num">Sesiones</th>
+                    <th scope="col" class="col-acciones"><span class="sr-only">Acciones</span></th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpo-usuarios"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div id="panel-auditoria" role="tabpanel" aria-labelledby="pestana-auditoria" hidden>
+          <section class="panel">
+            <div class="barra">
+              <h2>Registro de auditoría</h2>
+              <p class="detalle" id="info-auditoria" aria-live="polite"></p>
+            </div>
+            <form class="filtros filtros--auditoria" id="filtros-auditoria" role="search" aria-label="Filtrar la auditoría">
+              <div class="campo">
+                <label for="auditoria-accion">Acción</label>
+                <select id="auditoria-accion" name="accion"><option value="">Todas</option></select>
+              </div>
+              <div class="campo">
+                <label for="auditoria-usuario">Usuario</label>
+                <select id="auditoria-usuario" name="usuarioId"><option value="">Todos</option></select>
+              </div>
+              <div class="campo">
+                <label for="auditoria-desde">Desde</label>
+                <input id="auditoria-desde" name="desde" type="date">
+              </div>
+              <div class="campo">
+                <label for="auditoria-hasta">Hasta</label>
+                <input id="auditoria-hasta" name="hasta" type="date">
+              </div>
+              <button type="reset" class="boton boton--texto">Limpiar filtros</button>
+            </form>
+            <p class="aviso" id="aviso-auditoria" role="status"></p>
+            <div class="tabla-contenedor">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Fecha</th>
+                    <th scope="col">Quién</th>
+                    <th scope="col">Acción</th>
+                    <th scope="col">Detalle</th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpo-auditoria"></tbody>
+              </table>
+            </div>
+            <nav class="paginacion" aria-label="Páginas de la auditoría">
+              <button type="button" class="boton boton--secundario boton--chico" id="auditoria-anterior">Anterior</button>
+              <span id="auditoria-pagina"></span>
+              <button type="button" class="boton boton--secundario boton--chico" id="auditoria-siguiente">Siguiente</button>
+            </nav>
+          </section>
+        </div>
+
+        <div id="panel-sistema" role="tabpanel" aria-labelledby="pestana-sistema" hidden>
+          <section class="panel">
+            <h2>Estado del sistema</h2>
+            <dl class="ficha" id="ficha-sistema"></dl>
+          </section>
+        </div>
+      </div>
+    </section>
+
     <!-- Vista: mi cuenta (todos los roles) -->
     <section class="vista" data-vista="cuenta" hidden>
       <header class="cabecera">
@@ -445,6 +581,7 @@
   <script src="js/vistas/inventario.js"></script>
   <script src="js/vistas/ordenes.js"></script>
   <script src="js/vistas/cuenta.js"></script>
+  <script src="js/vistas/administracion.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
