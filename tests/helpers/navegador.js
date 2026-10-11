@@ -37,13 +37,21 @@ async function abrirNavegador(app, { hash = '' } = {}) {
   }
 
   const peticiones = [];
+  let enCurso = 0;
   window.fetch = async (url, opciones = {}) => {
     const metodo = (opciones.method || 'GET').toUpperCase();
     peticiones.push(`${metodo} ${url}`);
     let peticion = request(app)[metodo.toLowerCase()](url);
     Object.entries(opciones.headers || {}).forEach(([nombre, valor]) => { peticion = peticion.set(nombre, valor); });
     if (opciones.body !== undefined) peticion = peticion.send(opciones.body);
-    const respuesta = await peticion;
+    enCurso += 1;
+    let respuesta;
+    try {
+      respuesta = await peticion;
+    } finally {
+      // Se descuenta en el siguiente turno, cuando la página ya procesó la respuesta.
+      setTimeout(() => { enCurso -= 1; }, 0);
+    }
     return {
       status: respuesta.status,
       ok: respuesta.status >= 200 && respuesta.status < 300,
@@ -73,6 +81,15 @@ async function abrirNavegador(app, { hash = '' } = {}) {
         throw new Error(`No se cumplió a tiempo: ${descripcion}${errores.length ? `. Errores de la página: ${errores.join(' | ')}` : ''}`);
       }
       await new Promise((resolver) => { setTimeout(resolver, 5); });
+    }
+  }
+
+  /** Espera a que la página termine lo que tenga pendiente (peticiones encadenadas incluidas). */
+  async function reposo() {
+    let quietos = 0;
+    while (quietos < 3) {
+      await new Promise((resolver) => { setTimeout(resolver, 5); });
+      quietos = enCurso === 0 ? quietos + 1 : 0;
     }
   }
 
@@ -135,7 +152,12 @@ async function abrirNavegador(app, { hash = '' } = {}) {
     peticiones,
     errores,
     textos: (selector) => $$(selector).map((el) => el.textContent.trim()),
-    cerrar: () => window.close(),
+    reposo,
+    /** Cierra el navegador cuando la página ya no tiene trabajo pendiente. */
+    async cerrar() {
+      await reposo();
+      window.close();
+    },
   };
 }
 
