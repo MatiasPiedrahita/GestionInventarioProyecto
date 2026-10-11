@@ -40,6 +40,57 @@
       </div>
     </header>
 
+    <!-- Vista: panel del dueño (dueño y administrador) -->
+    <section class="vista" data-vista="panel" hidden>
+      <header class="cabecera">
+        <div>
+          <h1>Panel del taller</h1>
+          <p class="resumen" id="resumen-panel" aria-live="polite"></p>
+        </div>
+        <button type="button" class="boton boton--secundario" id="boton-actualizar-panel">Actualizar</button>
+      </header>
+
+      <div class="contenedor">
+        <p class="aviso" id="aviso-panel" role="status"></p>
+        <div class="indicadores" id="indicadores-panel"></div>
+
+        <div class="rejilla-graficos">
+          <section class="panel" aria-labelledby="titulo-grafico-ordenes">
+            <h2 id="titulo-grafico-ordenes">Órdenes finalizadas por semana</h2>
+            <p class="detalle">Últimas 8 semanas, según la fecha en que se cerró cada orden.</p>
+            <div id="grafico-ordenes"></div>
+          </section>
+          <section class="panel" aria-labelledby="titulo-grafico-gasto">
+            <h2 id="titulo-grafico-gasto">Costo de los repuestos usados por mes</h2>
+            <p class="detalle">Últimos 6 meses. No incluye los repuestos devueltos por órdenes canceladas.</p>
+            <div id="grafico-gasto"></div>
+          </section>
+          <section class="panel" aria-labelledby="titulo-grafico-repuestos">
+            <h2 id="titulo-grafico-repuestos">Repuestos más usados</h2>
+            <p class="detalle">Unidades usadas en órdenes en los últimos 90 días.</p>
+            <div id="grafico-repuestos"></div>
+          </section>
+          <section class="panel" aria-labelledby="titulo-mecanicos">
+            <h2 id="titulo-mecanicos">Trabajo por mecánico</h2>
+            <p class="detalle">Órdenes abiertas hoy y órdenes cerradas en los últimos 30 días.</p>
+            <div class="tabla-contenedor">
+              <table class="tabla-compacta">
+                <thead>
+                  <tr>
+                    <th scope="col">Mecánico</th>
+                    <th scope="col" class="num">En proceso</th>
+                    <th scope="col" class="num">Finalizadas</th>
+                    <th scope="col" class="num">Tiempo medio de cierre</th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpo-mecanicos"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
     <!-- Vista: administración (dueño y administrador) -->
     <section class="vista" data-vista="administracion" hidden>
       <header class="cabecera">
@@ -495,6 +546,14 @@
     <section class="bloque-orden" aria-labelledby="titulo-estado-orden">
       <h3 id="titulo-estado-orden">Estado de la orden</h3>
       <div class="acciones" id="acciones-estado"></div>
+      <form id="formulario-reasignar" class="agregar-repuesto" novalidate hidden>
+        <div class="campo campo--crece">
+          <label for="reasignar-mecanico">Pasar la orden a otro mecánico</label>
+          <select id="reasignar-mecanico" name="mecanicoId" required></select>
+        </div>
+        <button type="submit" class="boton boton--secundario">Reasignar</button>
+      </form>
+      <p class="aviso" id="aviso-reasignar" role="status"></p>
       <ol class="historial historial--estados" id="historial-estados"></ol>
     </section>
 
@@ -570,6 +629,28 @@
     </form>
   </dialog>
 
+  <dialog id="dialogo-entrada" aria-labelledby="titulo-entrada">
+    <form id="formulario-entrada" novalidate>
+      <h2 id="titulo-entrada">Entrada de mercancía</h2>
+      <p id="texto-entrada"></p>
+      <div class="campo">
+        <label for="entrada-cantidad">Unidades que llegaron</label>
+        <input id="entrada-cantidad" name="cantidad" type="number" min="1" step="1" inputmode="numeric" required>
+        <p class="campo__error" data-error="cantidad"></p>
+      </div>
+      <div class="campo">
+        <label for="entrada-detalle">Factura, proveedor u observación <span class="opcional">(opcional)</span></label>
+        <input id="entrada-detalle" name="detalle" maxlength="200" autocomplete="off">
+        <p class="campo__error" data-error="detalle"></p>
+      </div>
+      <p class="aviso" id="aviso-entrada" role="alert"></p>
+      <div class="acciones">
+        <button type="submit" class="boton">Sumar al inventario</button>
+        <button type="button" class="boton boton--texto" id="boton-volver-entrada">Volver</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="dialogo-historial" aria-labelledby="titulo-historial">
     <h2 id="titulo-historial">Historial</h2>
     <ol id="lista-historial" class="historial"></ol>
@@ -578,10 +659,12 @@
 
   <script src="js/api.js"></script>
   <script src="js/comun.js"></script>
+  <script src="js/graficos.js"></script>
   <script src="js/vistas/inventario.js"></script>
   <script src="js/vistas/ordenes.js"></script>
   <script src="js/vistas/cuenta.js"></script>
   <script src="js/vistas/administracion.js"></script>
+  <script src="js/vistas/panel.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

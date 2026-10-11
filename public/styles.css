@@ -565,3 +565,86 @@ tr.inactivo td { color: var(--tinta-suave); }
 @media (max-width: 1100px) {
   .filtros--auditoria { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ===================== Panel del taller: indicadores y gráficos ===================== */
+:root {
+  /* Colores de las series: validados para daltonismo y contraste sobre el fondo de los paneles. */
+  --serie-1: #2b66ad;
+  --serie-2: #c8551f;
+  --grafico-guia: #dfe4e8;
+  --grafico-base: #aeb8c0;
+}
+
+.indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+.indicador { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio-panel); padding: 1rem 1.25rem; }
+.indicador p { margin: 0; }
+.indicador__titulo { color: var(--tinta-suave); font-size: 0.9rem; }
+.indicador__valor { font: 700 2rem/1.2 var(--fuente-condensada); margin-top: 0.15rem; }
+.indicador__nota { color: var(--tinta-suave); font-size: 0.875rem; margin-top: 0.25rem; }
+.indicador__nota--aviso { color: var(--tinta); }
+.indicador__simbolo {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: var(--oxido);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.rejilla-graficos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.rejilla-graficos .panel h2 { font-size: 1.3rem; }
+.rejilla-graficos .panel > .detalle { margin: 0.2rem 0 0.75rem; }
+.rejilla-graficos table { min-width: 0; }
+
+.grafico { position: relative; }
+.grafico__lienzo { display: block; max-width: 100%; height: auto; overflow: visible; }
+.grafico__guia { stroke: var(--grafico-guia); stroke-width: 1; }
+.grafico__base { stroke: var(--grafico-base); stroke-width: 1; }
+.grafico__eje { fill: var(--tinta-suave); font: 400 12px var(--fuente); font-variant-numeric: tabular-nums; }
+.grafico__eje--y { text-anchor: end; }
+.grafico__eje--x { text-anchor: middle; }
+.grafico__valor { fill: var(--tinta); font: 600 12px var(--fuente); text-anchor: middle; }
+.grafico__columna { fill: var(--serie-1); }
+.grafico__zona { fill: transparent; }
+.grafico__marca { outline: none; cursor: default; }
+.grafico__marca:hover .grafico__columna, .grafico__marca:focus-visible .grafico__columna { fill: var(--overol-oscuro); }
+.grafico__marca:focus-visible .grafico__zona { stroke: var(--overol); stroke-width: 2; }
+
+.grafico__recuadro {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: var(--tinta);
+  color: #fff;
+  border-radius: var(--radio-control);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+.grafico__recuadro strong { display: block; font-size: 0.95rem; }
+.grafico__recuadro span { color: #c9d6e3; }
+
+.grafico__tabla { margin-top: 0.75rem; font-size: 0.9rem; }
+.grafico__tabla summary { cursor: pointer; color: var(--overol); width: fit-content; }
+.grafico__tabla table { margin-top: 0.5rem; }
+.grafico__vacio { color: var(--tinta-suave); padding: 2rem 0; text-align: center; margin: 0; }
+
+.barras { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.barras__fila { display: grid; grid-template-columns: minmax(0, 11rem) 1fr; gap: 0.75rem; align-items: center; border-radius: var(--radio-control); }
+.barras__rotulo { min-width: 0; font-size: 0.925rem; line-height: 1.25; }
+/* Los nombres largos ocupan hasta dos renglones en lugar de cortarse con puntos suspensivos. */
+.barras__rotulo span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.barras__pista { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.barras__relleno { height: 14px; min-width: 2px; background: var(--serie-1); border-radius: 0 4px 4px 0; }
+.barras__fila:hover .barras__relleno, .barras__fila:focus-visible .barras__relleno { background: var(--overol-oscuro); }
+.barras__valor { font-weight: 600; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 960px) {
+  .rejilla-graficos { grid-template-columns: 1fr; }
+}

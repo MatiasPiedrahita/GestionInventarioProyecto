@@ -382,8 +382,10 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
   $('#pagina-anterior').addEventListener('click', () => { pagina -= 1; cargar(); });
   $('#pagina-siguiente').addEventListener('click', () => { pagina += 1; cargar(); });
 
+  let mecanicos = [];
+
   async function cargarMecanicos() {
-    const mecanicos = await api.pedir('/api/usuarios/mecanicos');
+    mecanicos = await api.pedir('/api/usuarios/mecanicos');
     const llenar = (select, textoVacio) => {
       select.replaceChildren(dom.crear('option', { texto: textoVacio }));
       select.firstChild.value = '';
@@ -453,8 +455,39 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
 
     formularioUsado.hidden = !(puedeTrabajar() && orden.estado === 'EN_PROCESO');
     $('#acciones-estado').replaceChildren(...botonesDeEstado(orden));
+    pintarReasignacion(orden);
     pintarNotas(orden);
   }
+
+  // ------------------------------------------- Reasignar (dueño y administrador)
+  const formularioReasignar = $('#formulario-reasignar');
+  const avisoReasignar = $('#aviso-reasignar');
+
+  function pintarReasignacion(orden) {
+    const otros = mecanicos.filter((m) => m.id !== orden.mecanico.id);
+    formularioReasignar.hidden = !(puedeReabrir() && orden.estado === 'EN_PROCESO' && otros.length > 0);
+    const select = $('#reasignar-mecanico');
+    const vacia = dom.crear('option', { texto: 'Selecciona un mecánico' });
+    vacia.value = '';
+    select.replaceChildren(vacia, ...otros.map((m) => {
+      const opcion = dom.crear('option', { texto: m.nombre });
+      opcion.value = m.id;
+      return opcion;
+    }));
+  }
+
+  formularioReasignar.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    avisoReasignar.textContent = '';
+    try {
+      const orden = await api.enviar(`/api/ordenes/${ordenAbierta.id}/mecanico`, 'PATCH', { mecanicoId: $('#reasignar-mecanico').value });
+      pintarDetalle(orden);
+      dom.aviso(avisoReasignar, `La orden pasó a ${orden.mecanico.nombre}.`, 'ok');
+      await cargar();
+    } catch (error) {
+      dom.aviso(avisoReasignar, error.message, 'error', error.detalles || []);
+    }
+  });
 
   const ETIQUETA_DE_CAMBIO = { EN_PROCESO: 'Reabierta', FINALIZADA: 'Finalizada', CANCELADA: 'Cancelada' };
 
@@ -519,6 +552,7 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
   async function abrirDetalle(id) {
     avisoUsado.textContent = '';
     avisoNotas.textContent = '';
+    avisoReasignar.textContent = '';
     try {
       const orden = await api.pedir(`/api/ordenes/${id}`);
       pintarDetalle(orden);
