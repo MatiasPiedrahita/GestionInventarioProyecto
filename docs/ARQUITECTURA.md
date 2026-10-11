@@ -92,6 +92,6 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 | Facilidad de uso | Una sola pantalla, mensajes de error junto a cada campo y textos en lenguaje del taller |
 | Velocidad (< 2 s) | Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
-| Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, 102 pruebas y CI |
+| Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, 163 pruebas y CI |
 | Crecimiento a futuro | Módulos por dominio (`auth`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
 | Seguridad | Login con contraseñas cifradas, sesiones con vencimiento, permisos por rol y por propiedad en la API, consultas parametrizadas y ningún secreto en el repositorio |
