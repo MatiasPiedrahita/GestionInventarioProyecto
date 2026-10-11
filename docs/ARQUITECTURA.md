@@ -113,6 +113,16 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 - **Cabeceras:** `helmet` con una política de contenido estricta (sin `unsafe-inline`). Una prueba revisa que `index.html` no tenga scripts, estilos ni manejadores en línea, para que la política no se rompa sin darse cuenta. No se fuerza HTTPS porque en el taller la aplicación se abre por HTTP en la red local.
 - **Auditoría:** los servicios reciben el registro de auditoría por parámetro y escriben dentro de la misma transacción de la operación: si la operación se deshace, no queda un rastro falso. Del intento fallido no se guarda el texto escrito como usuario, porque a veces la gente escribe ahí su contraseña.
 
+### ADR-15 · Administración de usuarios: quién gestiona a quién
+
+- **Contexto:** los usuarios solo se podían crear desde la consola (`npm run usuario:crear`). El taller necesita hacerlo desde la aplicación, pero un panel de usuarios mal diseñado es la forma más fácil de escalar privilegios.
+- **Decisión:** dos niveles. El **dueño** gestiona cualquier cuenta. El **administrador** gestiona solo mecánicos y recepcionistas: no puede crear, editar, desactivar ni restablecer cuentas de dueño o de otro administrador, ni ascender a nadie a esos roles. Así un administrador no puede crearse un cómplice con más poder ni dejar al dueño por fuera.
+- **Protecciones contra dejar el taller sin acceso:** nadie se desactiva ni se cambia el rol a sí mismo; siempre debe quedar un dueño activo; un mecánico con órdenes en proceso no se desactiva ni cambia de rol hasta reasignarlas.
+- **Contraseñas:** el administrador nunca escribe la contraseña de otro. El sistema genera una temporal de 12 caracteres, la muestra una sola vez y obliga a cambiarla (ADR-14). No queda en la auditoría.
+- **Sesiones:** desactivar, cambiar el rol o restablecer la contraseña cierra las sesiones del usuario, para que los permisos viejos no sigan vivos hasta 8 horas.
+- **Dónde vive la regla:** en `usuario.service.js`. La API marca cada cuenta como `gestionable` o no, y la interfaz solo oculta los botones; si alguien llama la API directamente, el servicio responde 403.
+- **Estado del sistema extensible:** `sistema.service.js` permite que otros módulos registren su propia sección (el correo y el modelo de predicción lo usarán en el Sprint 3) sin que el módulo de sistema los conozca.
+
 ## Requisitos no funcionales cubiertos
 
 | RNF | Cómo se atiende |
@@ -121,5 +131,5 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 | Velocidad (< 2 s) | Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
 | Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, más de 200 pruebas (unitarias, integración, aceptación e interfaz) y CI |
-| Crecimiento a futuro | Módulos por dominio (`auth`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
+| Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
 | Seguridad | Contraseñas con `scrypt`, sesiones con vencimiento, bloqueo por intentos fallidos, permisos por rol y por propiedad en la API, cabeceras con CSP, auditoría, consultas parametrizadas y ningún secreto en el repositorio (ADR-08, ADR-09, ADR-14) |

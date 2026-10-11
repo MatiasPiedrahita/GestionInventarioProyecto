@@ -1,14 +1,13 @@
 const crypto = require('node:crypto');
 const { hashearPassword, verificarPassword, problemaDePassword, LONGITUD_MAXIMA } = require('./password');
 const { TODOS_LOS_ROLES, VISTA_INICIAL } = require('./roles');
+const { normalizarEmail } = require('./email');
 const { crearLimitador } = require('../../shared/limitador');
 const { ACCIONES } = require('../auditoria/acciones');
 const { SIN_AUDITORIA } = require('../auditoria/auditoria.service');
 const { ErrorDeValidacion, NoAutenticado, Conflicto, DemasiadosIntentos } = require('../../shared/errors');
 
 const PATRON_USUARIO = /^[a-z0-9._-]{3,30}$/i;
-const PATRON_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const LIMITE_EMAIL = 120;
 
 // Fuerza bruta: 5 fallos seguidos con el mismo usuario lo bloquean 15 minutos,
 // exista o no (así el bloqueo no revela qué usuarios existen). El límite por
@@ -23,15 +22,6 @@ const HASH_DE_RELLENO = hashearPassword('relleno-para-tiempo-constante');
 
 function hashDeToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
-}
-
-/** @returns {{ valor: string|null, error: string|null }} */
-function normalizarEmail(email) {
-  if (email === undefined || email === null || (typeof email === 'string' && email.trim() === '')) return { valor: null, error: null };
-  if (typeof email !== 'string' || email.trim().length > LIMITE_EMAIL || !PATRON_EMAIL.test(email.trim())) {
-    return { valor: null, error: 'El correo no es válido' };
-  }
-  return { valor: email.trim().toLowerCase(), error: null };
 }
 
 /**
@@ -186,6 +176,16 @@ function crearServicioAuth(repositorio, { horasDeSesion = 8, ahora = () => new D
       return repositorio.buscarPorId(usuario.id);
     },
 
+    /**
+     * Un administrador asigna una contraseña temporal: el usuario queda
+     * obligado a cambiarla, se cierran sus sesiones y se quita el bloqueo.
+     */
+    asignarPasswordTemporal(usuario, password) {
+      repositorio.actualizarPassword(usuario.id, hashearPassword(password), { debeCambiarPassword: true });
+      repositorio.borrarSesionesDe(usuario.id);
+      fallosPorUsuario.limpiar(usuario.usuario);
+    },
+
     /** Quita el bloqueo por intentos fallidos (lo usa la administración de usuarios). */
     desbloquear(usuario) {
       fallosPorUsuario.limpiar(usuario.usuario);
@@ -198,4 +198,4 @@ function crearServicioAuth(repositorio, { horasDeSesion = 8, ahora = () => new D
   };
 }
 
-module.exports = { crearServicioAuth, normalizarEmail };
+module.exports = { crearServicioAuth };

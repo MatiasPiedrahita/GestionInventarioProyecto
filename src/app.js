@@ -15,6 +15,10 @@ const { crearServicioOrdenes } = require('./modules/ordenes/orden.service');
 const { crearRutasOrdenes } = require('./modules/ordenes/orden.routes');
 const { crearRepositorioAuditoria } = require('./modules/auditoria/auditoria.repository');
 const { crearServicioAuditoria } = require('./modules/auditoria/auditoria.service');
+const { crearServicioUsuarios } = require('./modules/usuarios/usuario.service');
+const { crearRutasUsuarios } = require('./modules/usuarios/usuario.routes');
+const { crearRepositorioSistema } = require('./modules/sistema/sistema.repository');
+const { crearServicioSistema } = require('./modules/sistema/sistema.service');
 const { manejadorDeErrores } = require('./shared/errorHandler');
 
 /**
@@ -61,12 +65,22 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   const servicioAuth = crearServicioAuth(repositorioUsuarios, { ahora, auditoria: servicioAuditoria });
   const repositorioRepuestos = crearRepositorioRepuestos(db);
   const servicioInventario = crearServicioInventario(repositorioRepuestos, { auditoria: servicioAuditoria });
-  const servicioOrdenes = crearServicioOrdenes(crearRepositorioOrdenes(db), repositorioUsuarios, repositorioRepuestos, {
+  const repositorioOrdenes = crearRepositorioOrdenes(db);
+  const servicioOrdenes = crearServicioOrdenes(repositorioOrdenes, repositorioUsuarios, repositorioRepuestos, {
     auditoria: servicioAuditoria,
   });
+  const servicioUsuarios = crearServicioUsuarios(repositorioUsuarios, {
+    auth: servicioAuth,
+    ordenesEnProcesoDe: (mecanicoId) => repositorioOrdenes.contarEnProcesoDeMecanico(mecanicoId),
+    auditoria: servicioAuditoria,
+    ahora,
+  });
+  const servicioSistema = crearServicioSistema(crearRepositorioSistema(db), { ahora });
 
   const autenticar = crearAutenticacion(servicioAuth);
   const gestionInventario = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
+  // Panel de administración: usuarios, auditoría y estado del sistema.
+  const administracion = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
   // Crear órdenes y trabajar en ellas (repuestos, notas): mecánico, dueño y administrador.
   // La recepcionista solo consulta. El mecánico además solo toca SUS órdenes (lo valida el servicio).
   const trabajanEnOrdenes = autorizar(ROLES.MECANICO, ROLES.DUENO, ROLES.ADMINISTRADOR);
@@ -85,6 +99,10 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   app.use('/api', autenticar, exigirPasswordPropia);
   app.use('/api/repuestos', crearRutasInventario(servicioInventario, { soloGestion: gestionInventario }));
   app.get('/api/usuarios/mecanicos', (req, res) => res.json(servicioAuth.listarMecanicos()));
+  app.use('/api/usuarios', administracion, crearRutasUsuarios(servicioUsuarios));
+  app.get('/api/auditoria', administracion, (req, res) => res.json(servicioAuditoria.listar(req.query)));
+  app.get('/api/auditoria/acciones', administracion, (req, res) => res.json(servicioAuditoria.acciones()));
+  app.get('/api/sistema/estado', administracion, (req, res) => res.json(servicioSistema.estado()));
   app.use('/api/ordenes', crearRutasOrdenes(servicioOrdenes, { puedenCrear: trabajanEnOrdenes, puedenTrabajar: trabajanEnOrdenes }));
 
   app.use('/api', (req, res) => {
@@ -96,7 +114,14 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
 
   return {
     app,
-    servicios: { auth: servicioAuth, inventario: servicioInventario, ordenes: servicioOrdenes, auditoria: servicioAuditoria },
+    servicios: {
+      auth: servicioAuth,
+      inventario: servicioInventario,
+      ordenes: servicioOrdenes,
+      auditoria: servicioAuditoria,
+      usuarios: servicioUsuarios,
+      sistema: servicioSistema,
+    },
   };
 }
 

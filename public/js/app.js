@@ -17,6 +17,7 @@
   const MENU = [
     { vista: 'ordenes', etiqueta: 'Órdenes de trabajo', roles: TODOS },
     { vista: 'inventario', etiqueta: 'Inventario', roles: ['dueno', 'administrador'] },
+    { vista: 'administracion', etiqueta: 'Administración', roles: ['dueno', 'administrador'] },
     { vista: 'cuenta', etiqueta: 'Mi cuenta', roles: TODOS, enMenu: false },
   ];
 

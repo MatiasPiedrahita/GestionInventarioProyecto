@@ -523,3 +523,45 @@ tr.devuelto td.num { text-decoration: line-through; }
 @media (max-width: 860px) {
   .disposicion--cuenta { grid-template-columns: 1fr; }
 }
+
+/* ===================== Administración: usuarios, auditoría y sistema ===================== */
+.contenedor { max-width: 1280px; margin: 0 auto; padding: 0 1.5rem 3rem; }
+.disposicion--interna { max-width: none; padding: 0; }
+
+.pestanas { display: flex; gap: 0.25rem; border-bottom: 2px solid var(--tinta); margin-bottom: 1.25rem; flex-wrap: wrap; }
+.pestana {
+  font: 600 1rem var(--fuente);
+  background: transparent;
+  color: var(--tinta-suave);
+  border: 0;
+  border-radius: var(--radio-control) var(--radio-control) 0 0;
+  padding: 0.6rem 1.1rem;
+  cursor: pointer;
+}
+.pestana:hover { color: var(--tinta); }
+.pestana[aria-selected='true'] { background: var(--tinta); color: #fff; }
+
+.estado--alerta { background: var(--oxido-claro); color: var(--oxido); }
+tr.inactivo td { color: var(--tinta-suave); }
+
+.credencial {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  background: #fff;
+  border: 2px dashed var(--overol);
+  border-radius: var(--radio-control);
+}
+.credencial p { margin: 0 0 0.4rem; }
+.credencial__valor {
+  font: 700 1.5rem ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  letter-spacing: 0.08em;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.filtros--auditoria { grid-template-columns: repeat(4, minmax(130px, 1fr)) auto; }
+#ficha-sistema { margin-top: 1rem; }
+
+@media (max-width: 1100px) {
+  .filtros--auditoria { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
