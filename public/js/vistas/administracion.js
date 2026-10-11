@@ -308,8 +308,53 @@ window.Taller.vistas.administracion = (function crearVistaAdministracion() {
       dato(ficha, 'Órdenes', `${datos.ordenes} en total, ${datos.ordenesEnProceso} en proceso`);
       dato(ficha, 'Movimientos de inventario', datos.movimientos);
       dato(ficha, 'Registros de auditoría', datos.registrosDeAuditoria);
+      if (estado.alertas) {
+        dato(ficha, 'Alertas de stock', `${estado.alertas.activas} sin atender, ${estado.alertas.atendidas} con pedido hecho`);
+      }
+      if (estado.correo) dato(ficha, 'Correo', estado.correo.descripcion);
+      (estado.tareas || []).forEach((tarea) => {
+        const ultima = tarea.ultimaEjecucion ? `última vez ${formato.fechas.format(new Date(tarea.ultimaEjecucion))}` : 'todavía no ha corrido';
+        dato(ficha, `Tarea: ${tarea.nombre}`, `Cada ${tarea.cadaMinutos} min, ${ultima}${tarea.ultimoError ? `. Error: ${tarea.ultimoError}` : ''}`);
+      });
     } catch (error) {
       dato(ficha, 'Estado', `No disponible: ${error.message}`);
+    }
+    await cargarCorreos();
+  }
+
+  const ESTADO_DE_CORREO = { SIMULADO: 'Simulado (no se envió)', PENDIENTE: 'Enviando', ENVIADO: 'Enviado', ERROR: 'Falló' };
+
+  async function cargarCorreos() {
+    const cuerpoCorreos = $('#cuerpo-correos');
+    try {
+      const bandeja = await api.pedir('/api/correos');
+      $('#modo-correo').textContent = bandeja.descripcion;
+      cuerpoCorreos.replaceChildren(...bandeja.correos.map((correo) => {
+        const fila = dom.crear('tr');
+        fila.appendChild(dom.crear('td', { texto: formato.fechaSqlite(correo.creadoEn) }));
+        const para = dom.crear('td', { texto: correo.destinatario });
+        if (correo.usuario) para.appendChild(dom.crear('span', { clase: 'detalle', texto: correo.usuario }));
+        fila.appendChild(para);
+        const asunto = dom.crear('td');
+        const detalles = dom.crear('details');
+        detalles.appendChild(dom.crear('summary', { texto: correo.asunto }));
+        detalles.appendChild(dom.crear('pre', { clase: 'correo__cuerpo', texto: correo.cuerpo }));
+        asunto.appendChild(detalles);
+        fila.appendChild(asunto);
+        const estadoDelCorreo = dom.crear('td', { texto: ESTADO_DE_CORREO[correo.estado] || correo.estado });
+        if (correo.error) estadoDelCorreo.appendChild(dom.crear('span', { clase: 'detalle', texto: correo.error }));
+        fila.appendChild(estadoDelCorreo);
+        return fila;
+      }));
+      if (bandeja.correos.length === 0) {
+        const fila = dom.crear('tr');
+        const celda = dom.crear('td', { clase: 'vacio', texto: 'Todavía no se ha generado ningún correo.' });
+        celda.colSpan = 4;
+        fila.appendChild(celda);
+        cuerpoCorreos.appendChild(fila);
+      }
+    } catch (error) {
+      $('#modo-correo').textContent = `No se pudo cargar la bandeja: ${error.message}`;
     }
   }
 

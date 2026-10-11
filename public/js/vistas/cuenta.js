@@ -39,9 +39,43 @@ window.Taller.vistas.cuenta = (function crearVistaCuenta() {
     document.dispatchEvent(new window.CustomEvent('taller:sesion-cerrada'));
   });
 
+  // ------------------------------------------------------ Avisos por correo
+  const formularioAvisos = $('#formulario-avisos');
+  const avisoAvisos = $('#aviso-avisos');
+
+  async function cargarPreferencias() {
+    dom.limpiarErrores(formularioAvisos);
+    avisoAvisos.textContent = '';
+    try {
+      const preferencias = await api.pedir('/api/notificaciones/preferencias');
+      formularioAvisos.elements.email.value = preferencias.email || '';
+      formularioAvisos.elements.notificarPorCorreo.checked = preferencias.notificarPorCorreo;
+    } catch { /* con contraseña temporal todavía no se pueden consultar */ }
+  }
+
+  formularioAvisos.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    dom.limpiarErrores(formularioAvisos);
+    avisoAvisos.textContent = '';
+    try {
+      const guardadas = await api.enviar('/api/notificaciones/preferencias', 'PUT', {
+        email: formularioAvisos.elements.email.value,
+        notificarPorCorreo: formularioAvisos.elements.notificarPorCorreo.checked,
+      });
+      dom.aviso(avisoAvisos, guardadas.notificarPorCorreo
+        ? `Listo: los avisos también llegarán a ${guardadas.email}.`
+        : 'Listo: los avisos llegarán solo a la campana de la aplicación.', 'ok');
+    } catch (error) {
+      const sinCampo = dom.marcarErrores(formularioAvisos, error.detalles || []);
+      dom.aviso(avisoAvisos, error.message, 'error', sinCampo);
+    }
+  });
+
   return {
     alMostrar(usuarioActual) {
       usuario = usuarioActual;
+      formularioAvisos.closest('section').hidden = usuario.debeCambiarPassword;
+      if (!usuario.debeCambiarPassword) cargarPreferencias();
       formulario.reset();
       dom.limpiarErrores(formulario);
       aviso.textContent = '';

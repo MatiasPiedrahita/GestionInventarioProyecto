@@ -1,12 +1,20 @@
 const path = require('node:path');
 const { crearApp } = require('./app');
 const { crearConexion } = require('./db/connection');
+const { crearProgramador } = require('./tareas/programador');
 
 const PUERTO = Number(process.env.PORT) || 3000;
 const RUTA_DB = process.env.DB_PATH || path.join(__dirname, '..', 'data', 'inventario.db');
 
 const db = crearConexion(RUTA_DB);
-const { app } = crearApp({ db });
+const { app, servicios } = crearApp({ db });
+
+// Tarea programada: revisa todo el inventario cada cierto tiempo, por si algún
+// cambio de stock no pasó por la aplicación (por ejemplo, una carga directa a la base).
+const MINUTOS_ENTRE_REVISIONES = Math.max(1, Number(process.env.ALERTAS_INTERVALO_MIN) || 15);
+const programador = crearProgramador();
+programador.programar('Revisión de stock bajo', MINUTOS_ENTRE_REVISIONES, () => servicios.alertas.revisar(), { alIniciar: true });
+servicios.sistema.registrarSeccion('tareas', () => programador.estado());
 
 const servidor = app.listen(PUERTO, () => {
   console.log(`Inventario del taller corriendo en http://localhost:${PUERTO}`);
@@ -14,6 +22,7 @@ const servidor = app.listen(PUERTO, () => {
 });
 
 function cerrar() {
+  programador.detener();
   servidor.close(() => {
     db.close();
     process.exit(0);
