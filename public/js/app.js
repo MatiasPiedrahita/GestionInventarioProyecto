@@ -8,7 +8,7 @@
  * aquí es comodidad, la seguridad real está en la API.
  */
 (function iniciarAplicacion() {
-  const { api, dom, vistas } = window.Taller;
+  const { api, dom, vistas, campana } = window.Taller;
   const $ = (selector) => document.querySelector(selector);
 
   const TODOS = ['mecanico', 'recepcionista', 'dueno', 'administrador'];
@@ -19,6 +19,7 @@
     { vista: 'ordenes', etiqueta: 'Órdenes de trabajo', roles: TODOS },
     { vista: 'clientes', etiqueta: 'Clientes', roles: ['recepcionista', 'dueno', 'administrador'] },
     { vista: 'inventario', etiqueta: 'Inventario', roles: ['dueno', 'administrador'] },
+    { vista: 'alertas', etiqueta: 'Alertas', roles: ['dueno', 'administrador'] },
     { vista: 'administracion', etiqueta: 'Administración', roles: ['dueno', 'administrador'] },
     { vista: 'cuenta', etiqueta: 'Mi cuenta', roles: TODOS, enMenu: false },
   ];
@@ -72,11 +73,14 @@
     construirMenu();
     pantallaLogin.hidden = true;
     pantallaApp.hidden = false;
+    // Con contraseña temporal la API todavía no deja consultar las notificaciones.
+    if (!usuario.debeCambiarPassword) campana.iniciar(mostrarVista);
     const pedida = window.location.hash.slice(1);
     mostrarVista(pedida || inicial);
   }
 
   function salir(mensaje) {
+    campana.detener();
     usuarioActual = null;
     api.guardarToken(null);
     pantallaApp.hidden = true;
@@ -121,6 +125,7 @@
     const estabaBloqueado = usuarioActual.debeCambiarPassword;
     usuarioActual = evento.detail;
     if (estabaBloqueado) {
+      campana.iniciar(mostrarVista);
       construirMenu();
       mostrarVista(vistaInicial);
     }

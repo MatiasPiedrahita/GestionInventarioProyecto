@@ -33,6 +33,22 @@
     <header class="barra-app">
       <p class="barra-app__marca">Gestión del taller</p>
       <nav id="menu" class="barra-app__menu" aria-label="Secciones"></nav>
+      <div class="campana" id="campana" hidden>
+        <button type="button" class="campana__boton" id="boton-campana" aria-label="Notificaciones" aria-haspopup="true" aria-expanded="false" aria-controls="panel-notificaciones">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+            <path d="M12 3a6 6 0 0 0-6 6v3.6l-1.7 3.1A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.3L18 12.6V9a6 6 0 0 0-6-6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M9.5 20a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <span class="campana__contador" id="contador-campana" hidden></span>
+        </button>
+        <div class="campana__panel" id="panel-notificaciones" hidden>
+          <div class="campana__cabecera">
+            <strong>Notificaciones</strong>
+            <button type="button" class="boton boton--texto boton--chico" id="boton-leer-todas" hidden>Marcar todas como leídas</button>
+          </div>
+          <ul class="campana__lista" id="lista-notificaciones"></ul>
+        </div>
+      </div>
       <div class="barra-app__usuario">
         <span><strong id="nombre-usuario"></strong> <span id="rol-usuario" class="etiqueta-rol"></span></span>
         <a href="#cuenta" class="boton boton--texto" id="enlace-cuenta">Mi cuenta</a>
@@ -223,6 +239,23 @@
             <h2>Estado del sistema</h2>
             <dl class="ficha" id="ficha-sistema"></dl>
           </section>
+          <section class="panel panel--separado" aria-labelledby="titulo-correos">
+            <h2 id="titulo-correos">Bandeja de salida de correos</h2>
+            <p class="detalle" id="modo-correo"></p>
+            <div class="tabla-contenedor">
+              <table class="tabla-compacta">
+                <thead>
+                  <tr>
+                    <th scope="col">Fecha</th>
+                    <th scope="col">Para</th>
+                    <th scope="col">Asunto</th>
+                    <th scope="col">Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpo-correos"></tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </div>
     </section>
@@ -261,6 +294,24 @@
             <p class="detalle">Mínimo 8 caracteres. No puede ser igual a tu nombre de usuario.</p>
             <p class="aviso" id="aviso-password" role="status"></p>
             <button type="submit" class="boton">Cambiar contraseña</button>
+          </form>
+        </section>
+
+        <section class="panel" aria-labelledby="titulo-avisos">
+          <h2 id="titulo-avisos">Avisos por correo</h2>
+          <p>Los avisos siempre llegan a la campana de la aplicación. Si quieres, también te los enviamos a tu correo.</p>
+          <form id="formulario-avisos" novalidate>
+            <div class="campo">
+              <label for="avisos-email">Correo</label>
+              <input id="avisos-email" name="email" type="email" autocomplete="email" maxlength="120">
+              <p class="campo__error" data-error="email"></p>
+            </div>
+            <label class="interruptor">
+              <input type="checkbox" id="avisos-activar" name="notificarPorCorreo">
+              Enviarme los avisos también por correo
+            </label>
+            <p class="aviso" id="aviso-avisos" role="status"></p>
+            <button type="submit" class="boton boton--secundario">Guardar preferencias</button>
           </form>
         </section>
 
@@ -442,6 +493,47 @@
             <button type="button" class="boton boton--secundario boton--chico" id="pagina-siguiente">Siguiente</button>
           </nav>
           </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Vista: alertas de stock (dueño y administrador) -->
+    <section class="vista" data-vista="alertas" hidden>
+      <header class="cabecera">
+        <div>
+          <h1>Alertas de stock</h1>
+          <p class="resumen" id="resumen-alertas" aria-live="polite"></p>
+        </div>
+        <button type="button" class="boton boton--secundario" id="boton-revisar-alertas">Revisar ahora</button>
+      </header>
+
+      <div class="contenedor">
+        <div class="pestanas" id="pestanas-alertas" role="tablist" aria-label="Alertas abiertas o historial">
+          <button type="button" class="pestana" role="tab" data-grupo="ABIERTAS" aria-selected="true">Abiertas</button>
+          <button type="button" class="pestana" role="tab" data-grupo="RESUELTAS" aria-selected="false">Historial</button>
+        </div>
+        <section class="panel">
+          <p class="aviso" id="aviso-alertas" role="status"></p>
+          <div class="tabla-contenedor">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col" class="col-nombre">Repuesto</th>
+                  <th scope="col">Alerta</th>
+                  <th scope="col">Stock</th>
+                  <th scope="col" id="columna-fecha-alertas">Desde</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col" class="col-acciones"><span class="sr-only">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody id="cuerpo-alertas"></tbody>
+            </table>
+          </div>
+          <nav class="paginacion" id="paginacion-alertas" aria-label="Páginas del historial de alertas" hidden>
+            <button type="button" class="boton boton--secundario boton--chico" id="alertas-anterior">Anterior</button>
+            <span id="alertas-pagina"></span>
+            <button type="button" class="boton boton--secundario boton--chico" id="alertas-siguiente">Siguiente</button>
+          </nav>
         </section>
       </div>
     </section>
@@ -650,9 +742,27 @@
           <input id="usado-cantidad" name="cantidad" type="number" min="1" step="1" value="1" inputmode="numeric" required>
         </div>
         <button type="submit" class="boton">Registrar y descontar</button>
+        <button type="button" class="boton boton--texto" id="boton-reportar-faltante">¿No hay o no sirve? Avisar al dueño</button>
       </form>
       <p class="aviso" id="aviso-repuesto-usado" role="status"></p>
     </section>
+  </dialog>
+
+  <dialog id="dialogo-atender" aria-labelledby="titulo-atender">
+    <form id="formulario-atender" novalidate>
+      <h2 id="titulo-atender">Marcar pedido hecho</h2>
+      <p id="texto-atender"></p>
+      <div class="campo">
+        <label for="atender-nota">Nota <span class="opcional">(opcional)</span></label>
+        <input id="atender-nota" name="nota" maxlength="200" autocomplete="off" placeholder="Pedido a Autopartes, llega el jueves">
+        <p class="campo__error" data-error="nota"></p>
+      </div>
+      <p class="aviso" id="aviso-atender" role="alert"></p>
+      <div class="acciones">
+        <button type="submit" class="boton">Marcar pedido hecho</button>
+        <button type="button" class="boton boton--texto" id="boton-volver-atender">Volver</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="dialogo-cliente" class="dialogo-orden" aria-labelledby="titulo-cliente">
@@ -763,12 +873,14 @@
   <script src="js/api.js"></script>
   <script src="js/comun.js"></script>
   <script src="js/graficos.js"></script>
+  <script src="js/campana.js"></script>
   <script src="js/vistas/inventario.js"></script>
   <script src="js/vistas/ordenes.js"></script>
   <script src="js/vistas/cuenta.js"></script>
   <script src="js/vistas/administracion.js"></script>
   <script src="js/vistas/panel.js"></script>
   <script src="js/vistas/clientes.js"></script>
+  <script src="js/vistas/alertas.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

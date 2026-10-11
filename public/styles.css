@@ -515,7 +515,7 @@ tr.devuelto td.num { text-decoration: line-through; }
 }
 
 /* ===================== Mi cuenta ===================== */
-.disposicion--cuenta { grid-template-columns: minmax(280px, 420px) minmax(240px, 360px); }
+.disposicion--cuenta { grid-template-columns: repeat(auto-fit, minmax(280px, 380px)); }
 .disposicion--cuenta .panel h2 { margin-bottom: 0.75rem; }
 .barra-app__usuario a.boton--texto { color: #c9d6e3; text-decoration: none; }
 .barra-app__usuario a.boton--texto:hover { color: #fff; text-decoration: underline; }
@@ -662,3 +662,89 @@ tr.inactivo td { color: var(--tinta-suave); }
 .lista-vehiculos li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
 .lista-vehiculos .detalle { margin-left: auto; }
 #formulario-cliente { max-width: 34rem; }
+
+/* ===================== Alertas de stock y notificaciones (HU-08) ===================== */
+.campana { position: relative; }
+.campana__boton {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: #c9d6e3;
+  cursor: pointer;
+}
+.campana__boton:hover, .campana__boton[aria-expanded='true'] { color: #fff; border-color: #4a5b69; }
+.campana__contador {
+  position: absolute;
+  top: 0;
+  right: -0.15rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--oxido);
+  color: #fff;
+  font: 700 0.72rem/1.2rem var(--fuente);
+  text-align: center;
+}
+.campana__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  width: min(380px, 92vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: #fff;
+  color: var(--tinta);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-panel);
+  box-shadow: 0 12px 28px rgb(28 39 48 / 22%);
+  z-index: 20;
+}
+.campana__cabecera { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--linea); }
+.campana__cabecera .boton--texto { color: var(--overol); padding: 0; }
+.campana__lista { list-style: none; margin: 0; padding: 0; }
+.aviso-campana { border-bottom: 1px solid var(--linea); }
+.aviso-campana:last-child { border-bottom: 0; }
+.aviso-campana__boton {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-left: 4px solid transparent;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+}
+.aviso-campana__boton:hover { background: var(--fondo); }
+.aviso-campana--nuevo .aviso-campana__boton { border-left-color: var(--oxido); background: #fdf6f2; }
+.aviso-campana__boton span { font-size: 0.9rem; }
+.aviso-campana__vacio { padding: 1.5rem 1rem; text-align: center; color: var(--tinta-suave); }
+
+.alerta--agotado { background: var(--oxido); color: #fff; }
+.alerta--stock_bajo { background: var(--oxido-claro); color: var(--oxido); }
+.alerta--faltante_reportado { background: #dde6f1; color: var(--overol-oscuro); }
+.alerta--quiebre_proyectado { background: #ebe7e4; color: var(--tinta); }
+
+.panel--separado { margin-top: 1.25rem; }
+.correo__cuerpo { white-space: pre-wrap; font: 0.85rem/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace; margin: 0.5rem 0 0; }
+#cuerpo-correos summary { cursor: pointer; }
+.agregar-repuesto .boton--texto { color: var(--overol); padding-left: 0; }
+
+/* La barra superior va en dos renglones: arriba la marca, la campana y el usuario; abajo las secciones.
+   Así el menú puede crecer sin empujar ni partir los datos del usuario. */
+.barra-app { row-gap: 0; padding-top: 0.6rem; padding-bottom: 0; }
+.barra-app__menu { order: 4; flex: 1 0 100%; margin-right: 0; margin-top: 0.35rem; }
+.barra-app .campana { margin-left: auto; }
+
+/* Los botones de las tablas no se parten en varios renglones, ni las fechas de las alertas. */
+td .boton { white-space: nowrap; }
+#cuerpo-alertas td:nth-child(4) { white-space: nowrap; }
+#formulario-avisos .interruptor { margin: 0.25rem 0 0.9rem; }

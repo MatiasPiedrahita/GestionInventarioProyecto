@@ -546,9 +546,9 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
     vacia.value = '';
     select.appendChild(vacia);
     repuestos.forEach((r) => {
-      const opcion = dom.crear('option', { texto: `${r.sku}: ${r.nombre} (quedan ${r.stockActual})` });
+      // Los agotados se pueden elegir: no para registrarlos, sino para avisar que hacen falta.
+      const opcion = dom.crear('option', { texto: `${r.sku}: ${r.nombre} (${r.stockActual === 0 ? 'agotado' : `quedan ${r.stockActual}`})` });
       opcion.value = r.id;
-      opcion.disabled = r.stockActual === 0;
       select.appendChild(opcion);
     });
   }
@@ -593,6 +593,24 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
       formularioUsado.reset();
       const ultimo = orden.repuestos[orden.repuestos.length - 1];
       dom.aviso(avisoUsado, `Registrado. Se descontaron ${cantidad} unidad(es) del inventario${ultimo ? ` de ${ultimo.sku}` : ''}.`, 'ok');
+    } catch (error) {
+      dom.aviso(avisoUsado, error.message, 'error', error.detalles || []);
+    }
+  });
+
+  // El mecánico avisa que el repuesto falta o no sirve para este trabajo, aunque el sistema diga que hay.
+  $('#boton-reportar-faltante').addEventListener('click', async () => {
+    avisoUsado.textContent = '';
+    const repuestoId = $('#usado-repuesto').value;
+    if (!repuestoId) {
+      dom.aviso(avisoUsado, 'Selecciona primero el repuesto que hace falta.', 'error');
+      return;
+    }
+    try {
+      const alerta = await api.enviar(`/api/repuestos/${repuestoId}/faltantes`, 'POST', {
+        nota: `Para la orden #${ordenAbierta.id} (${ordenAbierta.vehiculo.placa})`,
+      });
+      dom.aviso(avisoUsado, `Se avisó al dueño que falta ${alerta.repuesto.sku}.`, 'ok');
     } catch (error) {
       dom.aviso(avisoUsado, error.message, 'error', error.detalles || []);
     }
