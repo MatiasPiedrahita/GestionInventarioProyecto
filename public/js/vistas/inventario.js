@@ -30,6 +30,14 @@ window.Taller.vistas.inventario = (function crearVistaInventario() {
     ENTRADA: 'Entrada de mercancía',
   };
 
+  /** Texto de cada movimiento en el historial: los que vienen de una orden dicen de cuál. */
+  function etiquetaDeMovimiento(movimiento) {
+    if (movimiento.tipo === 'USO_EN_ORDEN' && movimiento.ordenId) return `Usado en la orden #${movimiento.ordenId}`;
+    if (movimiento.tipo === 'DEVOLUCION' && movimiento.ordenId) return `Devuelto al cancelar la orden #${movimiento.ordenId}`;
+    if (movimiento.tipo === 'ENTRADA' && movimiento.detalle) return `Entrada: ${movimiento.detalle}`;
+    return ETIQUETAS_MOVIMIENTO[movimiento.tipo] || movimiento.tipo;
+  }
+
   let repuestosVisibles = [];
 
   const { pedir } = window.Taller.api;
@@ -120,6 +128,7 @@ window.Taller.vistas.inventario = (function crearVistaInventario() {
     const celdaAcciones = crear('td');
     const acciones = crear('div', { clase: 'acciones-fila' });
     [
+      ['Entrada', 'entrada', ''],
       ['Editar', 'editar', ''],
       ['Historial', 'historial', ''],
       ['Dar de baja', 'baja', 'peligro'],
@@ -242,6 +251,10 @@ window.Taller.vistas.inventario = (function crearVistaInventario() {
       modoEditar(repuesto);
     }
 
+    if (boton.dataset.accion === 'entrada') {
+      abrirEntrada(repuesto);
+    }
+
     if (boton.dataset.accion === 'baja') {
       if (!window.confirm(`¿Dar de baja ${repuesto.sku}? Dejará de aparecer en el catálogo, pero su historial se conserva.`)) return;
       try {
@@ -262,9 +275,8 @@ window.Taller.vistas.inventario = (function crearVistaInventario() {
         lista.replaceChildren();
         movimientos.forEach((m) => {
           const item = crear('li');
-          const etiqueta = m.ordenId ? `Usado en la orden #${m.ordenId}` : (ETIQUETAS_MOVIMIENTO[m.tipo] || m.tipo);
-          item.appendChild(crear('span', { texto: etiqueta }));
-          const signo = m.cantidad > 0 && m.tipo === 'AJUSTE' ? '+' : '';
+          item.appendChild(crear('span', { texto: etiquetaDeMovimiento(m) }));
+          const signo = m.cantidad > 0 && ['AJUSTE', 'DEVOLUCION', 'ENTRADA'].includes(m.tipo) ? '+' : '';
           item.appendChild(crear('span', { clase: 'cantidad', texto: `${signo}${m.cantidad} (queda ${m.stockResultante})` }));
           item.appendChild(crear('span', { clase: 'fecha', texto: fechas.format(new Date(`${m.fecha.replace(' ', 'T')}Z`)) }));
           lista.appendChild(item);
@@ -275,6 +287,41 @@ window.Taller.vistas.inventario = (function crearVistaInventario() {
       }
     }
   });
+
+  // ------------------------------------------------ Entrada de mercancía
+  const dialogoEntrada = $('#dialogo-entrada');
+  const formularioEntrada = $('#formulario-entrada');
+  const avisoEntrada = $('#aviso-entrada');
+  let repuestoDeEntrada = null;
+
+  function abrirEntrada(repuesto) {
+    repuestoDeEntrada = repuesto;
+    formularioEntrada.reset();
+    window.Taller.dom.limpiarErrores(formularioEntrada);
+    avisoEntrada.textContent = '';
+    $('#titulo-entrada').textContent = `Entrada de ${repuesto.sku}`;
+    $('#texto-entrada').textContent = `${repuesto.nombre}. Hoy hay ${repuesto.stockActual} en el inventario.`;
+    dialogoEntrada.showModal();
+    $('#entrada-cantidad').focus();
+  }
+
+  formularioEntrada.addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    window.Taller.dom.limpiarErrores(formularioEntrada);
+    avisoEntrada.textContent = '';
+    const { cantidad, detalle } = Object.fromEntries(new FormData(formularioEntrada));
+    try {
+      const actualizado = await window.Taller.api.enviar(`${API}/${repuestoDeEntrada.id}/entradas`, 'POST', { cantidad, detalle });
+      dialogoEntrada.close();
+      mostrarAviso(avisoTabla, `Entrada registrada: ${actualizado.sku} quedó con ${actualizado.stockActual} unidades.`, 'ok');
+      await cargar();
+    } catch (error) {
+      const sinCampo = window.Taller.dom.marcarErrores(formularioEntrada, error.detalles || []);
+      mostrarAviso(avisoEntrada, error.message, 'error', sinCampo);
+    }
+  });
+
+  $('#boton-volver-entrada').addEventListener('click', () => dialogoEntrada.close());
 
   let temporizador;
   busqueda.addEventListener('input', () => {

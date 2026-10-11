@@ -47,8 +47,8 @@ Cada historia tiene una prueba de aceptación escrita como **Dado / Cuando / Ent
 
 | Rol | Al iniciar sesión entra a | Puede |
 |---|---|---|
-| **Dueño del taller** | Inventario | Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas. Cambiar el estado de cualquier orden y **reabrir** las que ya se cerraron. Entra también al panel de administración y es el **único** que crea o modifica dueños y administradores |
-| **Administrador** | Administración | **Panel de administración:** crear usuarios (mecánicos y recepcionistas), editarlos, activarlos o desactivarlos, asignarles una contraseña temporal, cerrar sus sesiones y desbloquearlos; consultar la auditoría y el estado del sistema. Además gestiona el inventario y las órdenes. No puede tocar cuentas de dueño ni de otros administradores |
+| **Dueño del taller** | Panel | **Panel del taller:** valor del inventario, stock por reponer, órdenes por semana, costo de repuestos por mes, repuestos más usados y trabajo por mecánico. **Reasignar** órdenes a otro mecánico y registrar **entradas de mercancía**. Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas. Cambiar el estado de cualquier orden y **reabrir** las que ya se cerraron. Entra también al panel de administración y es el **único** que crea o modifica dueños y administradores |
+| **Administrador** | Administración | **Panel de administración:** crear usuarios (mecánicos y recepcionistas), editarlos, activarlos o desactivarlos, asignarles una contraseña temporal, cerrar sus sesiones y desbloquearlos; consultar la auditoría y el estado del sistema. Además ve el panel del taller, gestiona el inventario y las órdenes, y reasigna órdenes. No puede tocar cuentas de dueño ni de otros administradores |
 | **Mecánico** | Órdenes de trabajo | Crear órdenes, que quedan a su nombre. Ver **solo sus** órdenes. Registrar repuestos usados (se descuentan del stock) y escribir notas de la reparación. Finalizar o cancelar sus órdenes desde el tablero. Consultar el inventario, pero no modificarlo |
 | **Recepcionista** | Órdenes de trabajo | Consultar el listado global con filtros por placa, cliente, mecánico y estado. No puede modificar nada |
 | **Todos** | — | "Mi cuenta": cambiar su contraseña y cerrar su sesión en todos los dispositivos |
@@ -133,13 +133,13 @@ npm test                 # todas las pruebas
 npm run test:cobertura   # con reporte de cobertura
 ```
 
-Resultado actual: **351 pruebas en 32 suites, todas en verde.**
+Resultado actual: **401 pruebas en 35 suites, todas en verde.**
 
 | Tipo | Carpeta | Qué verifican |
 |---|---|---|
 | Aceptación | `tests/aceptacion/` | Un archivo por historia, con escenarios Dado/Cuando/Entonces |
-| Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría) y administración de usuarios |
-| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", panel de administración, tablero Kanban y cambio de estado |
+| Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría), administración de usuarios y panel del taller |
+| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", panel de administración, panel del taller con sus gráficos, tablero Kanban y cambio de estado |
 | Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros, cambio de estado), reglas de transición, lector de CSV, política y hash de contraseñas, y limitador de intentos |
 
 Cada prueba crea su propia base de datos en memoria y sus propios usuarios (`tests/helpers/contexto.js`), así que las pruebas no dependen unas de otras.
@@ -186,12 +186,13 @@ src/
 │   ├── auth/                    Roles, contraseñas, sesiones, límite de intentos, middleware y rutas
 │   ├── inventario/              Repuestos, CSV e historial de movimientos
 │   ├── ordenes/                 Órdenes, clientes, vehículos, repuestos usados, notas, filtros y estados
+│   ├── panel/                   Indicadores del negocio para el dueño (consultas agregadas)
 │   ├── sistema/                 Estado del sistema para el panel de administración
 │   └── usuarios/                Administración de usuarios (quién gestiona a quién)
 └── shared/                      Errores de dominio, manejador de errores y limitador de intentos
 public/
 ├── index.html, styles.css
-└── js/                          api.js (token), comun.js, app.js (enrutador por rol), vistas/
+└── js/                          api.js (token), comun.js, graficos.js (SVG propio), app.js (enrutador por rol), vistas/
 tests/
 ├── aceptacion/  integration/  interfaz/  unit/  helpers/
 scripts/
@@ -216,6 +217,7 @@ Todas las rutas, salvo `/api/salud` y `/api/auth/login`, exigen la cabecera `Aut
 | POST · PUT · DELETE | `/api/repuestos[/:id]` | Dueño, admin | Crear, editar, dar de baja |
 | POST | `/api/repuestos/importar` | Dueño, admin | Carga masiva por CSV |
 | GET | `/api/repuestos/:id/movimientos` | Dueño, admin | Historial del repuesto |
+| POST | `/api/repuestos/:id/entradas` | Dueño, admin | Entrada de mercancía: `{ cantidad, detalle? }`. Suma al stock y deja el movimiento `ENTRADA` |
 | GET | `/api/usuarios/mecanicos` | Con sesión | Mecánicos activos |
 | GET | `/api/usuarios` | Dueño, admin | Todas las cuentas con su estado (activa, bloqueada, sesiones abiertas) y los roles que el actor puede asignar |
 | POST | `/api/usuarios` | Dueño, admin | Crea un usuario y devuelve su contraseña temporal una sola vez. El admin solo crea mecánicos y recepcionistas |
@@ -232,6 +234,8 @@ Todas las rutas, salvo `/api/salud` y `/api/auth/login`, exigen la cabecera `Aut
 | POST | `/api/ordenes/:id/repuestos` | Mecánico (suyas), dueño, admin | Registra repuestos usados y descuenta stock |
 | PATCH | `/api/ordenes/:id/notas` | Mecánico (suyas), dueño, admin | Guarda las notas de la reparación |
 | PATCH | `/api/ordenes/:id/estado` | Mecánico (suyas), dueño, admin | Cambia el estado: `{ estado, motivo?, devolverRepuestos? }`. Cancelar y reabrir exigen `motivo`. Reabrir es solo para dueño y admin |
+| PATCH | `/api/ordenes/:id/mecanico` | Dueño, admin | Reasigna una orden en proceso: `{ mecanicoId }` |
+| GET | `/api/panel/resumen` | Dueño, admin | Indicadores del negocio: inventario, órdenes por semana, costo de repuestos por mes, más usados y trabajo por mecánico |
 | GET | `/api/ordenes/:id/historial` | Con sesión (el mecánico, solo las suyas) | Cambios de estado de la orden: quién, cuándo y por qué |
 
 Todos los errores tienen la misma forma:
@@ -306,7 +310,7 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 - Proponer la arquitectura por capas y la estructura de carpetas a partir de nuestros diagramas (clases, componentes, C4).
 - Generar el código de las historias HU-01 a HU-07: autenticación y roles, inventario, órdenes, repuestos usados, notas, listado con filtros, cambio de estado con tablero Kanban, migraciones de la base de datos e interfaz web.
 - Endurecer la seguridad: límite de intentos de inicio de sesión, cambio de contraseña, cabeceras, auditoría.
-- Proponer qué puede hacer cada rol y construir el panel de administración.
+- Proponer qué puede hacer cada rol y construir el panel de administración y el panel del taller con sus gráficos.
 - Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.
 - Redactar este README y la documentación en `docs/`.

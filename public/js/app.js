@@ -15,6 +15,7 @@
 
   /** Qué roles ven cada vista (en orden de aparición). enMenu: false la deja fuera de la barra de secciones. */
   const MENU = [
+    { vista: 'panel', etiqueta: 'Panel', roles: ['dueno', 'administrador'] },
     { vista: 'ordenes', etiqueta: 'Órdenes de trabajo', roles: TODOS },
     { vista: 'inventario', etiqueta: 'Inventario', roles: ['dueno', 'administrador'] },
     { vista: 'administracion', etiqueta: 'Administración', roles: ['dueno', 'administrador'] },

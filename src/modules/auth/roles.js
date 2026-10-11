@@ -13,7 +13,7 @@ const TODOS_LOS_ROLES = Object.freeze(Object.values(ROLES));
 
 /** Vista a la que se redirige cada rol después del login. */
 const VISTA_INICIAL = Object.freeze({
-  [ROLES.DUENO]: 'inventario',
+  [ROLES.DUENO]: 'panel',
   [ROLES.ADMINISTRADOR]: 'administracion',
   [ROLES.MECANICO]: 'ordenes',
   [ROLES.RECEPCIONISTA]: 'ordenes',

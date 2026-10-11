@@ -19,6 +19,8 @@ const { crearServicioUsuarios } = require('./modules/usuarios/usuario.service');
 const { crearRutasUsuarios } = require('./modules/usuarios/usuario.routes');
 const { crearRepositorioSistema } = require('./modules/sistema/sistema.repository');
 const { crearServicioSistema } = require('./modules/sistema/sistema.service');
+const { crearRepositorioPanel } = require('./modules/panel/panel.repository');
+const { crearServicioPanel } = require('./modules/panel/panel.service');
 const { manejadorDeErrores } = require('./shared/errorHandler');
 
 /**
@@ -76,10 +78,11 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
     ahora,
   });
   const servicioSistema = crearServicioSistema(crearRepositorioSistema(db), { ahora });
+  const servicioPanel = crearServicioPanel(crearRepositorioPanel(db), { ahora });
 
   const autenticar = crearAutenticacion(servicioAuth);
   const gestionInventario = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
-  // Panel de administración: usuarios, auditoría y estado del sistema.
+  // Panel de administración (usuarios, auditoría, sistema) y panel del dueño (indicadores, reasignar órdenes).
   const administracion = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
   // Crear órdenes y trabajar en ellas (repuestos, notas): mecánico, dueño y administrador.
   // La recepcionista solo consulta. El mecánico además solo toca SUS órdenes (lo valida el servicio).
@@ -103,7 +106,12 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
   app.get('/api/auditoria', administracion, (req, res) => res.json(servicioAuditoria.listar(req.query)));
   app.get('/api/auditoria/acciones', administracion, (req, res) => res.json(servicioAuditoria.acciones()));
   app.get('/api/sistema/estado', administracion, (req, res) => res.json(servicioSistema.estado()));
-  app.use('/api/ordenes', crearRutasOrdenes(servicioOrdenes, { puedenCrear: trabajanEnOrdenes, puedenTrabajar: trabajanEnOrdenes }));
+  app.use('/api/ordenes', crearRutasOrdenes(servicioOrdenes, {
+    puedenCrear: trabajanEnOrdenes,
+    puedenTrabajar: trabajanEnOrdenes,
+    puedenReasignar: administracion,
+  }));
+  app.get('/api/panel/resumen', administracion, (req, res) => res.json(servicioPanel.resumen()));
 
   app.use('/api', (req, res) => {
     res.status(404).json({ error: 'RUTA_NO_ENCONTRADA', mensaje: `No existe ${req.method} ${req.originalUrl}`, detalles: [] });
@@ -121,6 +129,7 @@ function crearApp({ db = crearConexion(':memory:'), ahora } = {}) {
       auditoria: servicioAuditoria,
       usuarios: servicioUsuarios,
       sistema: servicioSistema,
+      panel: servicioPanel,
     },
   };
 }

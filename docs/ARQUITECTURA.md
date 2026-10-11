@@ -123,6 +123,18 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 - **Dónde vive la regla:** en `usuario.service.js`. La API marca cada cuenta como `gestionable` o no, y la interfaz solo oculta los botones; si alguien llama la API directamente, el servicio responde 403.
 - **Estado del sistema extensible:** `sistema.service.js` permite que otros módulos registren su propia sección (el correo y el modelo de predicción lo usarán en el Sprint 3) sin que el módulo de sistema los conozca.
 
+### ADR-16 · Panel del taller: consultas agregadas y gráficos propios
+
+- **Contexto:** el dueño necesita ver el negocio de un vistazo (cuánto vale el inventario, cuánto se trabaja, qué se gasta) sin exportar nada a Excel.
+- **Una sola consulta:** `GET /api/panel/resumen` devuelve todo el panel. Las sumas las hace SQLite (`panel.repository.js`); el servicio solo completa con ceros las semanas y meses sin movimiento, para que el gráfico muestre el hueco en lugar de saltárselo.
+- **Fecha de cierre de una orden:** es su último paso a "Finalizada" en el historial de estados. Una orden reabierta y vuelta a cerrar cuenta una sola vez, en la fecha del cierre definitivo.
+- **Costo de repuestos:** sale de `detalle_repuestos` (que guarda el costo unitario del momento) y excluye los devueltos por órdenes canceladas.
+- **Las fechas se agrupan en UTC**, que es como SQLite las guarda. Una orden cerrada un domingo después de las 7 p. m. (hora de Colombia) cae en la semana siguiente. Para indicadores semanales y mensuales la diferencia es pequeña; se documenta como límite conocido.
+- **Gráficos sin librería:** `public/js/graficos.js` genera SVG y HTML a mano. Una librería de gráficos pesa más que toda la interfaz actual y obligaría a relajar la política de contenido (muchas insertan estilos en línea). Dos tipos bastan: columnas en el tiempo y barras para comparar.
+- **Reglas de los gráficos:** una sola serie usa un solo color; el texto nunca lleva el color de la serie; se rotulan solo el valor más alto y el periodo actual; cada gráfico tiene una tabla equivalente ("Ver como tabla") y el detalle aparece igual con el ratón que con el teclado. Los colores de las series (`--serie-1`, `--serie-2`) se validaron para daltonismo y contraste sobre el fondo de los paneles.
+- **Indicadores como cifras, no como gráficos:** un solo número (valor del inventario, órdenes en proceso) se lee mejor como cifra. El aviso de stock lleva símbolo y texto, no solo color.
+- **Acciones del dueño:** reasignar una orden en proceso a otro mecánico (queda en la auditoría) y registrar entradas de mercancía con el movimiento `ENTRADA`, distinto del ajuste manual: el historial distingue "llegó mercancía" de "se corrigió un conteo".
+
 ## Requisitos no funcionales cubiertos
 
 | RNF | Cómo se atiende |
@@ -131,5 +143,5 @@ Los contenedores *Servicio de Predicción*, *Tarea Programada (alertas)* y el se
 | Velocidad (< 2 s) | Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
 | Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, más de 200 pruebas (unitarias, integración, aceptación e interfaz) y CI |
-| Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
+| Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `panel`, `inventario`, `ordenes`); los siguientes serán `alertas` y `prediccion` |
 | Seguridad | Contraseñas con `scrypt`, sesiones con vencimiento, bloqueo por intentos fallidos, permisos por rol y por propiedad en la API, cabeceras con CSP, auditoría, consultas parametrizadas y ningún secreto en el repositorio (ADR-08, ADR-09, ADR-14) |

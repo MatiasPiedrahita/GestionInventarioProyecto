@@ -23,8 +23,8 @@ describe('Interfaz · inicio de sesión, menú por rol y "Mi cuenta"', () => {
   test.each([
     ['mecanico', ['Órdenes de trabajo'], 'ordenes'],
     ['recepcionista', ['Órdenes de trabajo'], 'ordenes'],
-    ['dueno', ['Órdenes de trabajo', 'Inventario', 'Administración'], 'inventario'],
-    ['administrador', ['Órdenes de trabajo', 'Inventario', 'Administración'], 'administracion'],
+    ['dueno', ['Panel', 'Órdenes de trabajo', 'Inventario', 'Administración'], 'panel'],
+    ['administrador', ['Panel', 'Órdenes de trabajo', 'Inventario', 'Administración'], 'administracion'],
   ])('%s: ve su menú y entra a su vista inicial', async (rol, menu, vista) => {
     await nav.iniciarSesion(ctx.usuario(rol));
 

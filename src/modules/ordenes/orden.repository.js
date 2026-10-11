@@ -106,6 +106,7 @@ function crearRepositorioOrdenes(db) {
        WHERE h.orden_id = ?
        ORDER BY h.id
     `),
+    cambiarMecanico: db.prepare("UPDATE ordenes SET mecanico_id = @mecanicoId, actualizado_en = datetime('now') WHERE id = @id"),
     enProcesoDeMecanico: db.prepare("SELECT COUNT(*) AS n FROM ordenes WHERE mecanico_id = ? AND estado = 'EN_PROCESO'"),
     marcarDevueltos: db.prepare('UPDATE detalle_repuestos SET devuelto = 1 WHERE orden_id = ? AND devuelto = 0'),
   };
@@ -230,6 +231,9 @@ function crearRepositorioOrdenes(db) {
         usuario: fila.usuario,
         fecha: fila.fecha,
       }));
+    },
+    cambiarMecanico(id, mecanicoId) {
+      sentencias.cambiarMecanico.run({ id, mecanicoId });
     },
     contarEnProcesoDeMecanico(mecanicoId) {
       return sentencias.enProcesoDeMecanico.get(mecanicoId).n;
