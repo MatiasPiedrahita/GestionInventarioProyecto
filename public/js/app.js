@@ -20,6 +20,7 @@
     { vista: 'clientes', etiqueta: 'Clientes', roles: ['recepcionista', 'dueno', 'administrador'] },
     { vista: 'inventario', etiqueta: 'Inventario', roles: ['dueno', 'administrador'] },
     { vista: 'alertas', etiqueta: 'Alertas', roles: ['dueno', 'administrador'] },
+    { vista: 'prediccion', etiqueta: 'Predicción', roles: ['dueno', 'administrador'] },
     { vista: 'administracion', etiqueta: 'Administración', roles: ['dueno', 'administrador'] },
     { vista: 'cuenta', etiqueta: 'Mi cuenta', roles: TODOS, enMenu: false },
   ];

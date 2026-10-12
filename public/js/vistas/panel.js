@@ -37,7 +37,7 @@ window.Taller.vistas.panel = (function crearVistaPanel() {
     return tarjeta;
   }
 
-  function pintarIndicadores({ inventario, ordenes, gastoPorMes }) {
+  function pintarIndicadores({ inventario, ordenes, gastoPorMes }, compras) {
     const gastoDelMes = gastoPorMes[gastoPorMes.length - 1];
     const stockBajo = inventario.bajoMinimo > 0
       ? `${plural(inventario.bajoMinimo, 'repuesto', 'repuestos')} en el mínimo o por debajo${inventario.agotados ? `, ${plural(inventario.agotados, 'agotado', 'agotados')}` : ''}`
@@ -60,6 +60,13 @@ window.Taller.vistas.panel = (function crearVistaPanel() {
         valor: formato.pesos.format(gastoDelMes.valor),
         nota: plural(gastoDelMes.unidades, 'unidad', 'unidades'),
       }),
+      // Lo que la predicción de demanda sugiere invertir en compras (si ya se calculó).
+      ...(compras ? [indicador({
+        titulo: 'Compras sugeridas',
+        valor: formato.pesos.format(compras.total),
+        nota: compras.repuestos > 0 ? `${plural(compras.repuestos, 'repuesto', 'repuestos')} por pedir, según la predicción` : 'La predicción no sugiere compras hoy',
+        aviso: compras.urgentes > 0,
+      })] : []),
     );
   }
 
@@ -82,8 +89,8 @@ window.Taller.vistas.panel = (function crearVistaPanel() {
     }
   }
 
-  function pintar(resumen) {
-    pintarIndicadores(resumen);
+  function pintar(resumen, compras) {
+    pintarIndicadores(resumen, compras);
 
     graficos.columnas($('#grafico-ordenes'), {
       datos: resumen.ordenesPorSemana.map((s) => ({ etiqueta: semana(s.semana).corta, descripcion: semana(s.semana).larga, valor: s.finalizadas })),
@@ -116,7 +123,12 @@ window.Taller.vistas.panel = (function crearVistaPanel() {
     const aviso = $('#aviso-panel');
     aviso.textContent = '';
     try {
-      pintar(await api.pedir('/api/panel/resumen'));
+      // La predicción es opcional: si todavía no se ha calculado, el panel se muestra sin esa tarjeta.
+      const [resumen, compras] = await Promise.all([
+        api.pedir('/api/panel/resumen'),
+        api.pedir('/api/prediccion/reportes').then((reportes) => reportes.compras).catch(() => null),
+      ]);
+      pintar(resumen, compras);
     } catch (error) {
       dom.aviso(aviso, `No se pudo cargar el panel: ${error.message}`, 'error');
     }
