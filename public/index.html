@@ -635,6 +635,11 @@
               <input id="proveedor" name="proveedor" placeholder="Autopartes del Valle">
               <p class="campo__error" data-error="proveedor"></p>
             </div>
+            <div class="campo">
+              <label for="diasReposicion">Días que tarda en llegar un pedido</label>
+              <input id="diasReposicion" name="diasReposicion" type="number" min="1" max="180" step="1" inputmode="numeric" value="7">
+              <p class="campo__error" data-error="diasReposicion"></p>
+            </div>
             <p class="aviso" id="aviso-formulario" role="status"></p>
             <div class="acciones">
               <button type="submit" class="boton" id="boton-guardar">Guardar repuesto</button>

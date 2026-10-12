@@ -202,7 +202,7 @@ window.Taller.vistas.inventario = (function crearVistaInventario() {
   function modoEditar(repuesto) {
     limpiarErroresDeCampos();
     avisoFormulario.textContent = '';
-    ['id', 'sku', 'nombre', 'costo', 'stockActual', 'stockMinimo', 'proveedor', 'ubicacion'].forEach((campo) => {
+    ['id', 'sku', 'nombre', 'costo', 'stockActual', 'stockMinimo', 'diasReposicion', 'proveedor', 'ubicacion'].forEach((campo) => {
       formulario.elements[campo].value = repuesto[campo] ?? '';
     });
     tituloFormulario.textContent = `Editar ${repuesto.sku}`;
