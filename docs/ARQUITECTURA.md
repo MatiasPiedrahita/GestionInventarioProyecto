@@ -4,7 +4,7 @@ Este documento explica **por qué** el código está organizado así. Los diagra
 
 ## Relación con los diagramas
 
-| Diagrama | Qué está implementado (Sprints 1 y 2, y alertas del Sprint 3) |
+| Diagrama | Qué está implementado (Sprints 1, 2 y 3) |
 |---|---|
 | Clases | `Usuario` con rol, `Repuesto`, `MovimientoInventario`, `Cliente`, `Vehiculo`, `OrdenTrabajo` y `DetalleRepuesto` (composición con la orden) |
 | Componentes | Interfaz de usuario → API REST → módulos **Auth**, **Inventario** y **Órdenes** → Base de datos |
@@ -187,6 +187,17 @@ Del Sprint 3 ya existen la *Tarea Programada* (`src/tareas/programador.js`, que 
 - **Trazabilidad:** cada ejecución guarda quién la lanzó, sus parámetros, cuánto tardó y con qué versión del modelo, de Python y de las librerías se calculó. Se conservan las últimas 12.
 - **Integración con las alertas:** el modelo informa qué repuestos se agotarían antes de poder reponerlos. El servicio de alertas abre para ellos la alerta `QUIEBRE_PROYECTADO`, la actualiza en cada ejecución y la cierra cuando deja de proyectarse o cuando el stock llega de verdad a su mínimo (ahí manda la alerta real).
 - **Cómo se prueba:** las pruebas de la aplicación usan un motor simulado que respeta el contrato, y una **prueba de contrato** ejecuta el modelo real de punta a punta. En el pipeline esa prueba es obligatoria.
+
+### ADR-21 · Reportes de la predicción: decisiones, no curvas
+
+- **Contexto:** un pronóstico por sí solo no le sirve al dueño de un taller. La historia pedía "reportes, proyecciones y demás funcionalidades con las que se pueda aprovechar el modelo".
+- **Decisión:** la vista "Predicción" abre en lo que hay que hacer hoy (*Compras sugeridas*, por proveedor, con lo urgente primero) y deja el detalle técnico para quien quiera verlo. Los cinco reportes salen del mismo cálculo, así los números siempre coinciden entre sí.
+- **Los reportes son funciones puras** (`reportes.js`): reciben la lista de predicciones y devuelven el reporte. Se prueban sin base de datos. Usan el stock y el costo de ahora, no los del momento del cálculo.
+- **Honestidad sobre el modelo:** el reporte de precisión no muestra una métrica técnica sola, sino cuánto error ahorra el modelo frente a lo que haría cualquiera (repetir la última semana). Un modelo que apenas mejora ese método simple no se presenta como confiable, y los avisos del modelo (historia corta, no supera al ingenuo) se muestran tal cual.
+- **Gráfico de historia y pronóstico:** dos series, así que lleva leyenda; el pronóstico se distingue por color y además por su franja de intervalo, no solo por color. Una línea marca "hoy". El detalle aparece con el ratón y también recorriendo las semanas con las flechas del teclado, y hay una tabla equivalente.
+- **Exportación a CSV segura:** el archivo va separado por punto y coma y con marca de UTF-8, que es lo que abre bien Excel en español. Toda celda que empiece por `=`, `+`, `-` o `@` se neutraliza con un apóstrofo: de lo contrario, un nombre de proveedor escrito con mala intención se ejecutaría como fórmula al abrir el archivo (inyección de fórmulas). Tiene su prueba.
+- **La descarga exige sesión:** el archivo se pide con el token y se entrega al navegador como descarga; no hay un enlace público al reporte.
+- **Cerrar el ciclo:** desde el detalle de un repuesto se puede usar el punto de reorden calculado como stock mínimo. Así la predicción no solo informa: ajusta el umbral con el que trabajan las alertas.
 
 ## Requisitos no funcionales cubiertos
 
