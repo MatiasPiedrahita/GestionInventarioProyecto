@@ -130,4 +130,4 @@ function crearMotorPython({ interprete = resolverPython(), carpeta = CARPETA_DEL
   };
 }
 
-module.exports = { crearMotorPython, ErrorDelModelo };
+module.exports = { crearMotorPython, ErrorDelModelo, explicar };
