@@ -16,6 +16,21 @@ window.Taller.formato = {
     const dias = horas / 24;
     return `${dias.toLocaleString('es-CO', { maximumFractionDigits: 1 })} ${dias === 1 ? 'día' : 'días'}`;
   },
+  /** "2026-10-17" → "17 oct" (largo: "17 de octubre"). Sin Date: la fecha ya es un día de calendario. */
+  dia(texto, largo = false) {
+    if (!texto) return '';
+    const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const [, mes, dia] = texto.slice(0, 10).split('-').map(Number);
+    return largo ? `${dia} de ${MESES[mes - 1]}` : `${dia} ${MESES[mes - 1].slice(0, 3)}`;
+  },
+  /** 0.253 → "25 %". */
+  porcentaje(fraccion) {
+    return `${Math.round(fraccion * 100)} %`;
+  },
+  /** Cantidades con decimales del pronóstico: 6 → "6", 6.25 → "6,3". */
+  unidades(valor) {
+    return Number(valor).toLocaleString('es-CO', { maximumFractionDigits: 1 });
+  },
   /** SQLite guarda "2026-10-07 14:30:00" en UTC; esto lo vuelve fecha local legible. */
   fechaSqlite(texto) {
     if (!texto) return '';
