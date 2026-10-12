@@ -312,6 +312,14 @@ window.Taller.vistas.administracion = (function crearVistaAdministracion() {
         dato(ficha, 'Alertas de stock', `${estado.alertas.activas} sin atender, ${estado.alertas.atendidas} con pedido hecho`);
       }
       if (estado.correo) dato(ficha, 'Correo', estado.correo.descripcion);
+      if (estado.prediccion) {
+        const { ultimaEjecucion, version, motor } = estado.prediccion;
+        const ESTADOS = { EN_CURSO: 'calculando', COMPLETADA: 'completada', FALLIDA: 'falló' };
+        const ultima = ultimaEjecucion
+          ? `última ejecución ${ESTADOS[ultimaEjecucion.estado]} el ${formato.fechaSqlite(ultimaEjecucion.iniciadaEn)}${ultimaEjecucion.error ? `: ${ultimaEjecucion.error}` : ''}`
+          : 'todavía no se ha ejecutado';
+        dato(ficha, 'Predicción de demanda', `${version || motor}, ${ultima}`);
+      }
       (estado.tareas || []).forEach((tarea) => {
         const ultima = tarea.ultimaEjecucion ? `última vez ${formato.fechas.format(new Date(tarea.ultimaEjecucion))}` : 'todavía no ha corrido';
         dato(ficha, `Tarea: ${tarea.nombre}`, `Cada ${tarea.cadaMinutos} min, ${ultima}${tarea.ultimoError ? `. Error: ${tarea.ultimoError}` : ''}`);

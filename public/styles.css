@@ -748,3 +748,6 @@ tr.inactivo td { color: var(--tinta-suave); }
 td .boton { white-space: nowrap; }
 #cuerpo-alertas td:nth-child(4) { white-space: nowrap; }
 #formulario-avisos .interruptor { margin: 0.25rem 0 0.9rem; }
+
+/* ===================== Predicción de demanda (HU-09) ===================== */
+.sugerencia { display: block; font-size: 0.875rem; font-weight: 600; color: var(--overol-oscuro); }

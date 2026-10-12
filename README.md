@@ -13,7 +13,7 @@ Proyecto de semestre de **Ingeniería de Software (UPB, 2026-2)**. Es una aplica
 
 ## Estado del proyecto
 
-El repositorio cubre los **Sprints 1 y 2 completos** y la primera historia del **Sprint 3** (alertas de stock bajo).
+El repositorio cubre los **Sprints 1 y 2 completos** y el **Sprint 3**: alertas de stock bajo y predicción de demanda (el modelo y su integración; la vista con gráficos y reportes está en curso).
 
 | Sprint | ID | Historia de usuario | Rol | Estado |
 |---|---|---|---|---|
@@ -25,7 +25,7 @@ El repositorio cubre los **Sprints 1 y 2 completos** y la primera historia del *
 | 2 | HU-06 | Ver listado de órdenes de trabajo | Recepcionista | ✅ |
 | 2 | HU-07 | Actualización del estado de órdenes | Mecánico | ✅ |
 | 3 | HU-08 | Alertas de stock bajo | Dueño | ✅ |
-| 3 | — | Predicción de demanda de repuestos | Administrador | Pendiente |
+| 3 | HU-09 | Predicción de demanda de repuestos | Administrador | Modelo e integración ✅ · vista y reportes en curso |
 
 ### Criterios de aceptación y su prueba automática
 
@@ -41,6 +41,7 @@ Cada historia tiene una prueba de aceptación escrita como **Dado / Cuando / Ent
 | HU-06 Listado | Filtrar por placa devuelve solo coincidencias exactas | `tests/aceptacion/HU06.listado-ordenes.test.js` |
 | HU-07 Estado de órdenes | Finalizar una orden con 2 filtros consumidos deja descontadas 2 unidades en la base | `tests/aceptacion/HU07.actualizacion-estado.test.js` |
 | HU-08 Alertas de stock | Al llegar el stock a su mínimo se genera la alerta y el dueño es notificado (campana y correo) | `tests/aceptacion/HU08.alertas-stock-bajo.test.js` |
+| HU-09 Predicción | Con historial de consumo, el modelo proyecta la demanda de las próximas semanas y avisa de lo que se va a agotar | `tests/aceptacion/HU09.prediccion-demanda.test.js` |
 
 > **Sobre la HU-07:** el plan decía "descontar el stock al finalizar". En este sistema el stock se descuenta cuando el mecánico registra el repuesto (HU-04), para que el inventario siempre muestre lo que hay en el estante. Finalizar solo cambia el estado; la prueba confirma que el descuento en la base es de exactamente 2 unidades, una sola vez. Ver ADR-10 y ADR-12.
 
@@ -148,13 +149,14 @@ npm run test:cobertura   # con reporte de cobertura
 npm run test:python      # pruebas del modelo de predicción (pytest); antes: npm run prediccion:instalar -- --dev
 ```
 
-Resultado actual: **562 pruebas de la aplicación (Jest) en 44 suites y 184 del modelo (pytest), todas en verde.**
+Resultado actual: **643 pruebas de la aplicación (Jest) en 49 suites y 184 del modelo (pytest), todas en verde.**
 
 | Tipo | Carpeta | Qué verifican |
 |---|---|---|
 | Aceptación | `tests/aceptacion/` | Un archivo por historia, con escenarios Dado/Cuando/Entonces |
 | Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría), administración de usuarios, panel del taller, directorio de clientes, alertas de stock y notificaciones (en la aplicación y por correo) |
 | Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", panel de administración, panel del taller con sus gráficos, recepción (clientes, vehículos y autocompletado), campana de notificaciones, alertas de stock, tablero Kanban y cambio de estado |
+| Contrato | `tests/integration/prediccion.python.test.js` | La aplicación ejecuta el modelo real de Python y guarda su respuesta: si alguno de los dos lados cambia el formato, falla. Se omite con un aviso si no hay entorno de Python; en el pipeline es obligatoria |
 | Modelo (Python) | `prediccion/tests/` | El modelo de predicción: series, patrones de demanda, cada modelo de pronóstico, evaluación con origen móvil, política de inventario, clasificación ABC, contrato y línea de comandos |
 | Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros, cambio de estado), reglas de transición y de alertas, tareas programadas, lector de CSV, política y hash de contraseñas, y limitador de intentos |
 
@@ -168,7 +170,7 @@ Archivo: [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Se ejecuta en *
 
 | Job | Pasos |
 |---|---|
-| **Build y pruebas** | `npm ci` → `npm run build` (verifica la sintaxis de todos los archivos y que la app se construya) → `npm run test:cobertura` → publica el reporte de cobertura como artefacto |
+| **Build y pruebas** | `npm ci` → instala Python y las librerías del modelo → `npm run build` (verifica la sintaxis de todos los archivos y que la app se construya) → `npm run test:cobertura` → publica el reporte de cobertura como artefacto |
 | **Modelo de predicción (Python)** | Python 3.12 → `pip install -r prediccion/requirements-dev.txt` → `pytest` |
 | **Análisis de vulnerabilidades** | `npm ci` → `npm audit --audit-level=high` → `pip-audit` sobre las librerías de Python |
 
@@ -188,7 +190,10 @@ Rutas → Servicios → Repositorios            por módulo de dominio (ver abaj
         │                                   Tarea programada: revisa el stock cada 15 min
         │                                   Correo: simulado, o SMTP si está en el .env
         ▼
-SQLite + migraciones versionadas (src/db/migraciones/001…009)
+SQLite + migraciones versionadas (src/db/migraciones/001…010)
+        ▲
+        │ JSON por stdin / stdout (proceso aparte, una ejecución a la vez)
+Modelo de predicción en Python (prediccion/taller_prediccion)
 ```
 
 ```
@@ -200,7 +205,7 @@ src/
 │   └── migraciones/             001 inventario · 002 usuarios y sesiones · 003 órdenes
 │                                004 repuestos usados · 005 notas · 006 índices
 │                                007 estado de órdenes · 008 seguridad de cuentas
-│                                009 alertas y notificaciones
+│                                009 alertas y notificaciones · 010 predicción de demanda
 ├── modules/
 │   ├── alertas/                 Alertas de stock bajo: reglas, revisión y atención
 │   ├── auditoria/               Registro de acciones sensibles (quién, qué y cuándo)
@@ -210,6 +215,7 @@ src/
 │   ├── notificaciones/          Campana de la aplicación y correo (simulado o SMTP)
 │   ├── ordenes/                 Órdenes, clientes, vehículos, repuestos usados, notas, filtros y estados
 │   ├── panel/                   Indicadores del negocio para el dueño (consultas agregadas)
+│   ├── prediccion/              Extrae el consumo, ejecuta el modelo de Python y guarda sus resultados
 │   ├── sistema/                 Estado del sistema para el panel de administración
 │   └── usuarios/                Administración de usuarios (quién gestiona a quién)
 ├── shared/                      Errores de dominio, manejador de errores, limitador de intentos y eventos
@@ -272,6 +278,12 @@ Todas las rutas, salvo `/api/salud` y `/api/auth/login`, exigen la cabecera `Aut
 | PATCH · POST | `/api/notificaciones/:id/leida` · `/leer-todas` | Con sesión | Marca como leídos los avisos propios |
 | GET · PUT | `/api/notificaciones/preferencias` | Con sesión | Correo del usuario y si quiere recibir ahí los avisos |
 | GET | `/api/correos` | Dueño, admin | Bandeja de salida: los correos enviados o simulados |
+| POST | `/api/prediccion/ejecuciones` | Dueño, admin | Lanza el modelo: `{ horizonteSemanas?, nivelDeServicio? }`. Responde `202` y sigue calculando |
+| GET | `/api/prediccion/estado` | Dueño, admin | Si hay una ejecución en curso y cuál fue la última |
+| GET | `/api/prediccion/resumen` | Dueño, admin | La última predicción: un resultado por repuesto (modelo, demanda, punto de reorden, cantidad sugerida, fecha de quiebre) |
+| GET | `/api/prediccion/repuestos/:id` | Dueño, admin | Pronóstico semana a semana con su intervalo e historia de consumo, para el gráfico |
+| GET | `/api/prediccion/ejecuciones[/:id]` | Dueño, admin | Historial de ejecuciones: duración, versión del modelo, error si falló |
+| PATCH | `/api/repuestos/:id/minimo-sugerido` | Dueño, admin | Pone como stock mínimo el punto de reorden que calculó el modelo |
 | GET | `/api/panel/resumen` | Dueño, admin | Indicadores del negocio: inventario, órdenes por semana, costo de repuestos por mes, más usados y trabajo por mecánico |
 | GET | `/api/ordenes/:id/historial` | Con sesión (el mecánico, solo las suyas) | Cambios de estado de la orden: quién, cuándo y por qué |
 
@@ -299,6 +311,14 @@ Todos los errores tienen la misma forma:
 - **Faltante reportado:** el mecánico puede avisar que un repuesto falta o no sirve aunque el sistema diga que hay.
 
 **El correo es simulado por defecto.** Sin configurar nada, los correos no salen: quedan en la bandeja de salida, visible en **Administración > Sistema**. Para enviarlos de verdad, copie `.env.example` como `.env` y complete `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` y `SMTP_PASS` con los datos de su proveedor de correo. El `.env` nunca se sube al repositorio.
+
+### Predicción de demanda (HU-09)
+
+- **Qué hace:** con el consumo semanal de cada repuesto, el modelo pronostica las próximas semanas y calcula cuánto pedir, cuándo y en qué fecha se agotaría lo que hay. El detalle del modelo está en [`prediccion/README.md`](prediccion/README.md).
+- **Cómo se ejecuta:** el dueño o el administrador la lanzan cuando quieran, y una tarea programada la recalcula cada 24 horas. La aplicación extrae los datos, ejecuta el paquete de Python como un proceso aparte y guarda el resultado. Solo corre una ejecución a la vez.
+- **Integración con las alertas:** si un repuesto está por encima de su mínimo pero, al ritmo previsto, se agotaría antes de que alcance a llegar un pedido, se abre la alerta **"Se agotará pronto"** y se avisa al dueño. Además, cada alerta de stock muestra la cantidad que el modelo sugiere pedir.
+- **Días de reposición:** cada repuesto guarda cuántos días tarda en llegar su pedido (7 por defecto). Se edita en el inventario.
+- **Sin Python instalado** la aplicación funciona igual; la predicción queda como fallida con un mensaje que dice cómo instalarlo (`npm run prediccion:instalar`).
 
 ### Seguridad
 
@@ -359,6 +379,7 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 - Endurecer la seguridad: límite de intentos de inicio de sesión, cambio de contraseña, cabeceras, auditoría.
 - Proponer qué puede hacer cada rol y construir el panel de administración, el panel del taller con sus gráficos y las funciones de recepción.
 - Construir las alertas de stock bajo con notificaciones en la aplicación y por correo.
+- Integrar el modelo con la aplicación (ejecución, almacenamiento, alertas).
 - Programar el modelo de predicción en Python (`prediccion/`) y sus pruebas, a partir del enfoque que definió el equipo: series de tiempo sobre el historial de consumo, con modelos propios de demanda intermitente.
 - Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.

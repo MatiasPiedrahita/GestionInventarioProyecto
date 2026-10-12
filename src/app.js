@@ -31,6 +31,11 @@ const { crearRutasNotificaciones } = require('./modules/notificaciones/notificac
 const { crearRepositorioAlertas } = require('./modules/alertas/alerta.repository');
 const { crearServicioAlertas } = require('./modules/alertas/alerta.service');
 const { crearRutasAlertas } = require('./modules/alertas/alerta.routes');
+const { crearRepositorioConsumo } = require('./modules/prediccion/consumo.repository');
+const { crearRepositorioPrediccion } = require('./modules/prediccion/prediccion.repository');
+const { crearServicioPrediccion } = require('./modules/prediccion/prediccion.service');
+const { crearRutasPrediccion } = require('./modules/prediccion/prediccion.routes');
+const { crearMotorPython } = require('./modules/prediccion/motor-python');
 const { manejadorDeErrores } = require('./shared/errorHandler');
 
 /**
@@ -62,13 +67,15 @@ const cabecerasDeSeguridad = helmet({
  * Construye la aplicación. Recibe sus dependencias por parámetro para que
  * las pruebas usen una base en memoria, aislada y desechable.
  *
- * @param {{ db?: import('node:sqlite').DatabaseSync, ahora?: () => Date, transporteDeCorreo?: object, urlDeLaAplicacion?: string }} opciones
+ * @param {{ db?: import('node:sqlite').DatabaseSync, ahora?: () => Date, transporteDeCorreo?: object, urlDeLaAplicacion?: string,
+ *           motorDePrediccion?: { predecir: Function, descripcion: string } }} opciones
  */
 function crearApp({
   db = crearConexion(':memory:'),
   ahora,
   transporteDeCorreo = crearTransporteDeCorreo(),
   urlDeLaAplicacion = process.env.APP_URL || null,
+  motorDePrediccion = crearMotorPython(),
 } = {}) {
   const app = express();
 
@@ -86,6 +93,16 @@ function crearApp({
     destinatarios: () => repositorioUsuarios.listarQuienesGestionan(),
     auditoria: servicioAuditoria,
     urlDeLaAplicacion,
+    // La predicción se crea después: se consulta en el momento de listar, no al construir.
+    sugerencias: () => servicioPrediccion.sugerencias(),
+  });
+  const servicioPrediccion = crearServicioPrediccion({
+    consumo: crearRepositorioConsumo(db),
+    repositorio: crearRepositorioPrediccion(db),
+    motor: motorDePrediccion,
+    alertas: servicioAlertas,
+    auditoria: servicioAuditoria,
+    ahora,
   });
 
   // Conexión entre módulos: inventario y órdenes avisan; alertas y notificaciones reaccionan.
@@ -131,6 +148,7 @@ function crearApp({
   const servicioPanel = crearServicioPanel(crearRepositorioPanel(db), { ahora });
   servicioSistema.registrarSeccion('correo', () => servicioNotificaciones.estadoDelCorreo());
   servicioSistema.registrarSeccion('alertas', () => servicioAlertas.conteo());
+  servicioSistema.registrarSeccion('prediccion', () => servicioPrediccion.estadoParaElSistema());
 
   const autenticar = crearAutenticacion(servicioAuth);
   const gestionInventario = autorizar(ROLES.DUENO, ROLES.ADMINISTRADOR);
@@ -163,6 +181,12 @@ function crearApp({
   app.post('/api/repuestos/:id/faltantes', trabajanEnOrdenes, (req, res) => {
     res.status(201).json(servicioAlertas.reportarFaltante(leerId(req), req.body, req.usuario));
   });
+  // Aplica como stock mínimo el punto de reorden que calculó la predicción.
+  app.patch('/api/repuestos/:id/minimo-sugerido', gestionInventario, (req, res) => {
+    const id = leerId(req);
+    res.json(servicioInventario.cambiarStockMinimo(id, servicioPrediccion.minimoSugerido(id), req.usuario));
+  });
+  app.use('/api/prediccion', administracion, crearRutasPrediccion(servicioPrediccion));
   app.use('/api/repuestos', crearRutasInventario(servicioInventario, { soloGestion: gestionInventario }));
   app.get('/api/usuarios/mecanicos', (req, res) => res.json(servicioAuth.listarMecanicos()));
   app.use('/api/usuarios', administracion, crearRutasUsuarios(servicioUsuarios));
@@ -199,6 +223,7 @@ function crearApp({
       clientes: servicioClientes,
       notificaciones: servicioNotificaciones,
       alertas: servicioAlertas,
+      prediccion: servicioPrediccion,
     },
   };
 }

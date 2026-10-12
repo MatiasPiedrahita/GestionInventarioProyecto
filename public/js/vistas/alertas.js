@@ -47,6 +47,10 @@ window.Taller.vistas.alertas = (function crearVistaAlertas() {
     const unidades = repuesto.stockActual === 1 ? '1 unidad' : `${repuesto.stockActual} unidades`;
     const celdaStock = dom.crear('td', { texto: unidades });
     celdaStock.appendChild(dom.crear('span', { clase: 'detalle', texto: `Mínimo ${repuesto.stockMinimo}` }));
+    // Lo que recomienda la predicción de demanda, si ya se calculó.
+    if (alerta.prediccion && alerta.prediccion.cantidadSugerida > 0) {
+      celdaStock.appendChild(dom.crear('span', { clase: 'sugerencia', texto: `Sugerido: pedir ${alerta.prediccion.cantidadSugerida}` }));
+    }
     fila.appendChild(celdaStock);
 
     const celdaFecha = dom.crear('td', { texto: formato.fechaSqlite(grupo === 'RESUELTAS' ? alerta.resueltaEn : alerta.creadaEn) });

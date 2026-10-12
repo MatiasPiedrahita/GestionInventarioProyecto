@@ -14,6 +14,8 @@ const ALIAS_COLUMNAS = {
   stock: 'stockActual',
   stockminimo: 'stockMinimo',
   minimo: 'stockMinimo',
+  diasreposicion: 'diasReposicion',
+  reposicion: 'diasReposicion',
   proveedor: 'proveedor',
   ubicacion: 'ubicacion',
 };
