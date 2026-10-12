@@ -6,11 +6,12 @@ Este documento explica **por qué** el código está organizado así. Los diagra
 
 | Diagrama | Qué está implementado (Sprints 1, 2 y 3) |
 |---|---|
-| Clases | `Usuario` con rol, `Repuesto`, `MovimientoInventario`, `Cliente`, `Vehiculo`, `OrdenTrabajo` y `DetalleRepuesto` (composición con la orden) |
-| Componentes | Interfaz de usuario → API REST → módulos **Auth**, **Inventario** y **Órdenes** → Base de datos |
-| C4 nivel 2 | Contenedores *SPA Web* (`public/`), *API REST* (`src/`) y *Base de datos* (SQLite) |
+| Clases | `Usuario` con rol, `Repuesto`, `MovimientoInventario`, `Cliente`, `Vehiculo`, `OrdenTrabajo` y `DetalleRepuesto` (composición con la orden); del Sprint 3, `AlertaStock`, `Notificacion` y `PrediccionDemanda` con sus puntos semanales |
+| Componentes | Interfaz de usuario → API REST → módulos **Auth**, **Usuarios**, **Inventario**, **Órdenes**, **Clientes**, **Alertas**, **Notificaciones**, **Predicción**, **Panel**, **Auditoría** y **Sistema** → Base de datos |
+| C4 nivel 2 | Contenedores *SPA Web* (`public/`), *API REST* (`src/`), *Base de datos* (SQLite), *Tarea Programada* (`src/tareas/`) y *Servicio de Predicción* (`prediccion/`, en Python) |
 | Secuencia | El flujo "registrar repuestos y descontar stock" sigue el diagrama: API de órdenes → inventario → base de datos, en una sola transacción |
-| Casos de uso | "Gestionar inventario de repuestos" y su `<<include>>` "Descontar stock" desde la orden |
+| Casos de uso | "Gestionar inventario de repuestos" y su `<<include>>` "Descontar stock" desde la orden; "Recibir alerta de stock bajo" y "Consultar predicción de demanda" |
+| Despliegue | Un solo servidor Node.js que sirve la interfaz y la API, con SQLite en disco. Dos diferencias con el diagrama, ambas justificadas: SQLite en lugar de PostgreSQL (ADR-02) y el modelo de Python como proceso por lotes en lugar de servicio web (ADR-20) |
 
 Del Sprint 3 ya existen la *Tarea Programada* (`src/tareas/programador.js`, que revisa el stock) y la conexión con el servicio externo de correo (`modules/notificaciones/correo.js`, simulado o SMTP). El *Servicio de Predicción* es el paquete de Python de `prediccion/`, que la API ejecuta como un proceso aparte (ADR-19 y ADR-20).
 
@@ -27,7 +28,7 @@ Del Sprint 3 ya existen la *Tarea Programada* (`src/tareas/programador.js`, que 
 - **Contexto:** el diagrama de despliegue plantea PostgreSQL. Pero exigir un servidor PostgreSQL desde el primer día complica que "alguien ajeno al equipo levante el proyecto siguiendo solo el README", y también complica el pipeline.
 - **Alternativa descartada:** la librería `better-sqlite3`. Al probarla, intenta compilar código nativo durante la instalación, y eso falla en equipos Windows sin Visual Studio Build Tools.
 - **Decisión:** usar el SQLite que trae Node.js (`node:sqlite`). No hay dependencias nativas y `npm ci` funciona igual en cualquier máquina y en GitHub Actions.
-- **Consecuencia:** todo el SQL vive en un solo archivo (`repuesto.repository.js`). Migrar a PostgreSQL implica cambiar ese archivo y `db/connection.js`, sin tocar el servicio, las rutas ni las pruebas de la API.
+- **Consecuencia:** todo el SQL vive en los archivos `*.repository.js` (uno por módulo). Migrar a PostgreSQL implica reescribir esos archivos y `db/connection.js`, sin tocar los servicios, las rutas ni las pruebas de la API.
 
 ### ADR-03 · Arquitectura por capas con inyección de dependencias
 

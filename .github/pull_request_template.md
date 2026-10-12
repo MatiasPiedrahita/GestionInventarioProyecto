@@ -5,8 +5,8 @@
 -
 
 ## Cómo probarlo
-1. `npm ci`
-2. `npm test`
+1. `npm ci` (y `npm run prediccion:instalar -- --dev` si el cambio toca la predicción)
+2. `npm test` (y `npm run test:python` si el cambio toca el modelo)
 3. `npm start` y abrir http://localhost:3000
 
 ## Lista de verificación del autor
