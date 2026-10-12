@@ -44,7 +44,7 @@ from datetime import date
 
 import numpy as np
 
-from .modelos import FABRICAS, INGENUO, MEDIA_MOVIL, SIMPLICIDAD, candidatos
+from .modelos import FABRICAS, INGENUO, MEDIA_MOVIL, NOMBRE_LEGIBLE, SIMPLICIDAD, candidatos
 from .patrones import Patron
 
 HORIZONTE_DE_PRUEBA = 4
@@ -63,7 +63,13 @@ class Evaluacion:
 
     def resumen(self) -> dict:
         redondear = lambda valor: None if valor is None else round(float(valor), 3)  # noqa: E731
-        return {"modelo": self.modelo, "rmsse": redondear(self.rmsse), "wape": redondear(self.wape), "sesgo": redondear(self.sesgo)}
+        return {
+            "modelo": self.modelo,
+            "modeloNombre": NOMBRE_LEGIBLE[self.modelo],
+            "rmsse": redondear(self.rmsse),
+            "wape": redondear(self.wape),
+            "sesgo": redondear(self.sesgo),
+        }
 
 
 def _escala_ingenua(valores: np.ndarray) -> float:

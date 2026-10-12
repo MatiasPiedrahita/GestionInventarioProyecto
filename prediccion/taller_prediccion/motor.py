@@ -104,6 +104,7 @@ def _pronosticar_repuesto(repuesto: Repuesto, entrada: Entrada) -> dict:
             "semanasDePrueba": mejor.semanas_de_prueba,
         }
         metricas.pop("modelo")
+        metricas.pop("modeloNombre")
         if mejor.rmsse is None:
             aviso = f"Historia corta ({len(valores)} semanas): no alcanzó para probar el modelo."
         elif mejora is not None and mejora <= 0:
