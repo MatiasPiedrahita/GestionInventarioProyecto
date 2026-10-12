@@ -7,6 +7,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # jsdom 27 en adelante usa módulos que Jest no puede cargar en Node 22 (ver ADR-13).
+      - dependency-name: jsdom
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: chore
 

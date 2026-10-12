@@ -751,3 +751,58 @@ td .boton { white-space: nowrap; }
 
 /* ===================== Predicción de demanda (HU-09) ===================== */
 .sugerencia { display: block; font-size: 0.875rem; font-weight: 600; color: var(--overol-oscuro); }
+
+/* Gráfico de historia y pronóstico */
+.grafico__leyenda { list-style: none; margin: 0 0 0.4rem; padding: 0; display: flex; flex-wrap: wrap; gap: 0.3rem 1.25rem; font-size: 0.875rem; color: var(--tinta-suave); }
+.grafico__leyenda li { display: flex; align-items: center; gap: 0.45rem; }
+.grafico__clave { display: inline-block; width: 1.4rem; height: 0; border-top: 2px solid var(--serie-1); }
+.grafico__clave--estimado { border-top-color: var(--serie-2); }
+.grafico__clave--franja { height: 0.7rem; border-top: 0; background: var(--serie-2); opacity: 0.16; border-radius: 2px; }
+.grafico__linea { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.grafico__linea--real { stroke: var(--serie-1); }
+.grafico__linea--estimado { stroke: var(--serie-2); }
+.grafico__franja { fill: var(--serie-2); fill-opacity: 0.12; stroke: none; }
+.grafico__hoy { stroke: var(--grafico-base); stroke-width: 1; }
+.grafico__cursor { stroke: var(--tinta-suave); stroke-width: 1; pointer-events: none; }
+.grafico__punto { stroke: var(--panel); stroke-width: 2; pointer-events: none; fill: var(--serie-1); }
+.grafico__punto--estimado { fill: var(--serie-2); }
+.grafico__valor--final { text-anchor: start; }
+.grafico__zona:focus-visible { outline: none; stroke: var(--overol); stroke-width: 2; }
+
+/* Vista de predicción y sus reportes */
+.controles-prediccion { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; }
+.controles-prediccion .campo { margin-bottom: 0; }
+.controles-prediccion label { font-size: 0.8rem; color: var(--tinta-suave); }
+#contenido-prediccion > .panel .barra h2, #contenido-prediccion > .panel > h2 { font-size: 1.35rem; }
+#contenido-prediccion > .panel > .detalle { margin: 0.2rem 0 1rem; }
+#prediccion-vacia p { max-width: 62ch; }
+
+.proveedor { margin-top: 1.25rem; }
+.proveedor__cabecera { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.25rem 1rem; border-bottom: 2px solid var(--tinta); padding-bottom: 0.3rem; }
+.proveedor__cabecera h3 { margin: 0; font: 700 1.15rem var(--fuente-condensada); }
+.proveedor__total { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.proveedor table { min-width: 620px; }
+.proveedor th { border-bottom-width: 1px; }
+td.fuerte { font-weight: 600; }
+td .estado + .detalle, td .estado { margin-right: 0.4rem; }
+
+.clases-abc { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem; }
+.clase-abc { display: grid; grid-template-columns: auto 1fr; gap: 0 0.6rem; align-items: center; background: var(--fondo); border-radius: var(--radio-control); padding: 0.6rem 0.8rem; }
+.clase-abc strong { font: 700 1.4rem var(--fuente-condensada); }
+.clase-abc .detalle { grid-column: 1 / -1; }
+.insignia-abc { display: inline-grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; font-weight: 700; background: var(--tinta); color: #fff; }
+.insignia-abc--b { background: var(--tinta-suave); }
+.insignia-abc--c { background: #fff; color: var(--tinta); border: 2px solid var(--tinta-suave); }
+
+.nota-de-aviso { color: var(--oxido); }
+p.nota-de-aviso { background: var(--oxido-claro); border-left: 4px solid var(--oxido); padding: 0.6rem 0.9rem; border-radius: 0 var(--radio-control) var(--radio-control) 0; margin-top: 1rem; }
+.dialogo-orden--ancho { width: min(920px, 96vw); }
+tr.elegido td { font-weight: 600; }
+#boton-aplicar-minimo { margin-top: 0.75rem; }
+#ficha-prediccion { margin-top: 0.25rem; }
+
+/* Cada dato de una ficha es un bloque (título y valor juntos): la rejilla reparte bloques, no etiquetas sueltas. */
+.ficha { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.ficha__dato { min-width: 0; }
+
+.barras__valor { white-space: nowrap; }

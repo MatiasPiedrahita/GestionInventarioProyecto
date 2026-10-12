@@ -114,6 +114,9 @@ describirConPython('Contrato Node ↔ Python: la aplicación ejecuta el modelo r
   });
 
   describe('el motor por separado', () => {
+    // Arrancar Python puede tardar varios segundos cuando todas las suites corren a la vez.
+    jest.setTimeout(60000);
+
     test('comprobar informa que el modelo está disponible y su versión', async () => {
       expect(await crearMotorPython().comprobar()).toEqual({ disponible: true, version: expect.stringMatching(/^taller_prediccion \d+\.\d+\.\d+$/) });
     });

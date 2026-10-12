@@ -288,8 +288,10 @@ window.Taller.vistas.administracion = (function crearVistaAdministracion() {
 
   // --------------------------------------------------------------- Sistema
   function dato(lista, termino, valor) {
-    lista.appendChild(dom.crear('dt', { texto: termino }));
-    lista.appendChild(dom.crear('dd', { texto: valor }));
+    const bloque = dom.crear('div', { clase: 'ficha__dato' });
+    bloque.appendChild(dom.crear('dt', { texto: termino }));
+    bloque.appendChild(dom.crear('dd', { texto: valor }));
+    lista.appendChild(bloque);
   }
 
   async function cargarSistema() {

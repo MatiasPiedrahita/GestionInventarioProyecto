@@ -20,7 +20,6 @@ import traceback
 
 from . import __version__
 from .contrato import EntradaInvalida
-from .motor import predecir
 
 
 def _leer(ruta: str | None) -> bytes:
@@ -48,6 +47,10 @@ def main(argumentos: list[str] | None = None) -> int:
     analizador.add_argument("--indentado", action="store_true", help="Escribe el JSON con sangría, para leerlo a mano")
     analizador.add_argument("--version", action="version", version=f"taller_prediccion {__version__}")
     opciones = analizador.parse_args(argumentos)
+
+    # El motor (numpy, pandas, statsmodels) se carga aquí y no al inicio: así "--version",
+    # que la aplicación usa para comprobar que el modelo está disponible, responde al instante.
+    from .motor import predecir
 
     try:
         crudo = json.loads(_leer(opciones.entrada).decode("utf-8-sig"))

@@ -410,13 +410,15 @@ window.Taller.vistas.ordenes = (function crearVistaOrdenes() {
   let ordenAbierta = null;
 
   function dato(lista, termino, ...lineas) {
-    lista.appendChild(dom.crear('dt', { texto: termino }));
+    const bloque = dom.crear('div', { clase: 'ficha__dato' });
+    lista.appendChild(bloque);
+    bloque.appendChild(dom.crear('dt', { texto: termino }));
     const dd = dom.crear('dd');
     lineas.filter(Boolean).forEach((linea, i) => {
       if (linea instanceof window.Node) dd.appendChild(linea);
       else dd.appendChild(dom.crear('span', { clase: i === 0 ? '' : 'detalle', texto: linea }));
     });
-    lista.appendChild(dd);
+    bloque.appendChild(dd);
   }
 
   function pintarDetalle(orden) {

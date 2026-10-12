@@ -38,7 +38,7 @@ function crearMotorSimulado({ ajustar = (prediccion) => prediccion, falla = null
       modelo: media > 0 ? 'MEDIA_MOVIL' : 'SIN_HISTORIA',
       modeloNombre: media > 0 ? 'Media móvil de 8 semanas' : 'Sin modelo',
       metricas: { rmsse: media > 0 ? 0.8 : null, wape: media > 0 ? 0.3 : null, sesgo: media > 0 ? 0.05 : null, mejoraSobreIngenuo: media > 0 ? 0.2 : null, semanasDePrueba: media > 0 ? 52 : 0 },
-      comparados: media > 0 ? [{ modelo: 'MEDIA_MOVIL', rmsse: 0.8, wape: 0.3, sesgo: 0.05 }, { modelo: 'INGENUO', rmsse: 1, wape: 0.4, sesgo: 0 }] : [],
+      comparados: media > 0 ? [{ modelo: 'MEDIA_MOVIL', modeloNombre: 'Media móvil de 8 semanas', rmsse: 0.8, wape: 0.3, sesgo: 0.05 }, { modelo: 'INGENUO', modeloNombre: 'Última semana', rmsse: 1, wape: 0.4, sesgo: 0 }] : [],
       errorSemanal: 1,
       pronostico: Array.from({ length: entrada.horizonteSemanas }, (_, i) => ({
         semana: new Date(lunes.getTime() + i * 7 * 86400000).toISOString().slice(0, 10),

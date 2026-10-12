@@ -1,6 +1,7 @@
 const { ACCIONES } = require('../auditoria/acciones');
 const { SIN_AUDITORIA } = require('../auditoria/auditoria.service');
 const { ErrorDeValidacion, NoEncontrado, Conflicto } = require('../../shared/errors');
+const { comprasSugeridas, clasificacionAbc, sinMovimiento, precisionDelModelo, comprasEnCsv } = require('./reportes');
 
 const VERSION_DEL_CONTRATO = 1;
 const HORIZONTE_POR_DEFECTO = 8;
@@ -235,6 +236,25 @@ function crearServicioPrediccion({ consumo, repositorio, motor, alertas = null, 
       });
 
       return { ejecucion, ...prediccion, historia: { ...prediccion.historia, serie: historia } };
+    },
+
+    /** Reportes de la última predicción: compras sugeridas, clasificación ABC, repuestos sin movimiento y precisión del modelo. */
+    reportes() {
+      const ejecucion = exigirResultados();
+      const predicciones = repositorio.listarPredicciones(ejecucion.id).filter((p) => p.repuesto.activo);
+      return {
+        ejecucion,
+        compras: comprasSugeridas(predicciones),
+        abc: clasificacionAbc(predicciones),
+        sinMovimiento: sinMovimiento(predicciones),
+        precision: precisionDelModelo(predicciones),
+      };
+    },
+
+    /** El reporte de compras sugeridas como archivo CSV. @returns {{ nombre: string, contenido: string }} */
+    comprasCsv() {
+      const { ejecucion, compras } = this.reportes();
+      return { nombre: `compras-sugeridas-${ejecucion.fechaDeCorte}.csv`, contenido: comprasEnCsv(compras) };
     },
 
     /** @returns {Map<number, object>} Lo que la última predicción sugiere para cada repuesto (lo usan las alertas). */

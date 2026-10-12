@@ -107,6 +107,132 @@
       </div>
     </section>
 
+    <!-- Vista: predicción de demanda (administrador y dueño) -->
+    <section class="vista" data-vista="prediccion" hidden>
+      <header class="cabecera">
+        <div>
+          <h1>Predicción de demanda</h1>
+          <p class="resumen" id="resumen-prediccion" aria-live="polite"></p>
+        </div>
+        <form class="controles-prediccion" id="formulario-prediccion">
+          <div class="campo">
+            <label for="prediccion-horizonte">Proyectar</label>
+            <select id="prediccion-horizonte" name="horizonteSemanas">
+              <option value="4">4 semanas</option>
+              <option value="8" selected>8 semanas</option>
+              <option value="12">12 semanas</option>
+              <option value="26">26 semanas</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="prediccion-servicio">Nivel de servicio</label>
+            <select id="prediccion-servicio" name="nivelDeServicio">
+              <option value="0.9">90 % (menos colchón)</option>
+              <option value="0.95" selected>95 %</option>
+              <option value="0.98">98 % (más colchón)</option>
+            </select>
+          </div>
+          <button type="submit" class="boton" id="boton-calcular-prediccion">Calcular predicción</button>
+        </form>
+      </header>
+
+      <div class="contenedor">
+        <p class="aviso" id="aviso-prediccion" role="status"></p>
+
+        <section class="panel" id="prediccion-vacia" hidden>
+          <h2>Todavía no hay predicción</h2>
+          <p>El modelo usa el historial de repuestos usados en las órdenes para estimar cuánto se va a consumir en las próximas semanas, cuánto conviene pedir y en qué fecha se agotaría lo que hay.</p>
+          <p>Presione <strong>Calcular predicción</strong>. Entre más semanas de historia haya, mejor pronostica: con menos de 12 semanas usa promedios.</p>
+        </section>
+
+        <div id="contenido-prediccion" hidden>
+          <div class="indicadores" id="indicadores-prediccion"></div>
+
+          <div class="pestanas" id="pestanas-prediccion" role="tablist" aria-label="Reportes de la predicción">
+          <button type="button" class="pestana" role="tab" id="pestana-pred-compras" data-pestana="compras" aria-controls="panel-pred-compras" aria-selected="true">Compras sugeridas</button>
+          <button type="button" class="pestana" role="tab" id="pestana-pred-repuestos" data-pestana="repuestos" aria-controls="panel-pred-repuestos" aria-selected="false">Todos los repuestos</button>
+          <button type="button" class="pestana" role="tab" id="pestana-pred-abc" data-pestana="abc" aria-controls="panel-pred-abc" aria-selected="false">Clasificación ABC</button>
+          <button type="button" class="pestana" role="tab" id="pestana-pred-quietos" data-pestana="quietos" aria-controls="panel-pred-quietos" aria-selected="false">Sin movimiento</button>
+          <button type="button" class="pestana" role="tab" id="pestana-pred-precision" data-pestana="precision" aria-controls="panel-pred-precision" aria-selected="false">Precisión del modelo</button>
+          </div>
+
+          <section class="panel" id="panel-pred-compras" role="tabpanel" aria-labelledby="pestana-pred-compras">
+            <div class="barra">
+              <h2>Qué pedir hoy, por proveedor</h2>
+              <button type="button" class="boton boton--secundario" id="boton-exportar-compras">Exportar a Excel (CSV)</button>
+            </div>
+            <p class="detalle">Cantidades para cubrir el tiempo de reposición y 30 días más, con su colchón de seguridad. Primero lo que se agota antes.</p>
+            <div id="lista-compras"></div>
+          </section>
+
+          <section class="panel" id="panel-pred-repuestos" role="tabpanel" aria-labelledby="pestana-pred-repuestos" hidden>
+            <div class="tabla-contenedor">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col" class="col-nombre">Repuesto</th>
+                    <th scope="col">Demanda y modelo</th>
+                    <th scope="col" class="num">Demanda proyectada</th>
+                    <th scope="col" class="num">En stock</th>
+                    <th scope="col">Alcanza para</th>
+                    <th scope="col">Recomendación</th>
+                    <th scope="col" class="col-acciones"><span class="sr-only">Acciones</span></th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpo-prediccion"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel" id="panel-pred-abc" role="tabpanel" aria-labelledby="pestana-pred-abc" hidden>
+            <h2>Dónde se va la plata del inventario</h2>
+            <p class="detalle">Valor de los repuestos consumidos en el último año. Los de clase A concentran el 80 %: son los que conviene vigilar de cerca.</p>
+            <div class="clases-abc" id="resumen-abc"></div>
+            <div id="grafico-abc"></div>
+          </section>
+
+          <section class="panel" id="panel-pred-quietos" role="tabpanel" aria-labelledby="pestana-pred-quietos" hidden>
+            <h2>Repuestos sin movimiento</h2>
+            <p class="detalle">Tienen unidades en el estante pero llevan tres meses o más sin usarse. Es plata quieta: conviene no reponerlos.</p>
+            <div class="tabla-contenedor">
+              <table class="tabla-compacta">
+                <thead>
+                  <tr>
+                    <th scope="col">Repuesto</th>
+                    <th scope="col">Sin uso</th>
+                    <th scope="col" class="num">En stock</th>
+                    <th scope="col" class="num">Valor inmovilizado</th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpo-quietos"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel" id="panel-pred-precision" role="tabpanel" aria-labelledby="pestana-pred-precision" hidden>
+            <h2>Qué tan bien pronostica el modelo</h2>
+            <p id="resumen-precision"></p>
+            <p class="detalle">Cada modelo se probó escondiéndole semanas que ya pasaron y comparando su pronóstico con lo que ocurrió. "Mejora" es cuánto error menos comete frente a repetir la última semana.</p>
+            <div class="tabla-contenedor">
+              <table class="tabla-compacta">
+                <thead>
+                  <tr>
+                    <th scope="col">Repuesto</th>
+                    <th scope="col">Modelo</th>
+                    <th scope="col" class="num">Mejora</th>
+                    <th scope="col" class="num">Error por unidad</th>
+                    <th scope="col">Sesgo</th>
+                    <th scope="col">Observación</th>
+                  </tr>
+                </thead>
+                <tbody id="cuerpo-precision"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
     <!-- Vista: administración (dueño y administrador) -->
     <section class="vista" data-vista="administracion" hidden>
       <header class="cabecera">
@@ -753,6 +879,43 @@
     </section>
   </dialog>
 
+  <dialog id="dialogo-prediccion" class="dialogo-orden dialogo-orden--ancho" aria-labelledby="titulo-prediccion">
+    <header class="dialogo-orden__cabecera">
+      <h2 id="titulo-prediccion">Pronóstico</h2>
+      <form method="dialog"><button class="boton boton--texto" aria-label="Cerrar pronóstico">Cerrar</button></form>
+    </header>
+
+    <p class="nota-de-aviso" id="nota-prediccion" hidden></p>
+
+    <section class="bloque-orden" aria-labelledby="titulo-grafico-prediccion">
+      <h3 id="titulo-grafico-prediccion">Consumo por semana y pronóstico</h3>
+      <div id="grafico-prediccion"></div>
+    </section>
+
+    <section class="bloque-orden" aria-labelledby="titulo-ficha-prediccion">
+      <h3 id="titulo-ficha-prediccion">Qué dice el modelo</h3>
+      <dl class="ficha" id="ficha-prediccion"></dl>
+      <p class="aviso" id="aviso-detalle-prediccion" role="status"></p>
+      <button type="button" class="boton boton--secundario" id="boton-aplicar-minimo" hidden></button>
+    </section>
+
+    <section class="bloque-orden" aria-labelledby="titulo-comparados">
+      <h3 id="titulo-comparados">Modelos que compitieron</h3>
+      <div class="tabla-contenedor">
+        <table class="tabla-compacta">
+          <thead>
+            <tr>
+              <th scope="col">Modelo</th>
+              <th scope="col" class="num">Error (RMSSE)</th>
+              <th scope="col" class="num">Error por unidad</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo-comparados"></tbody>
+        </table>
+      </div>
+    </section>
+  </dialog>
+
   <dialog id="dialogo-atender" aria-labelledby="titulo-atender">
     <form id="formulario-atender" novalidate>
       <h2 id="titulo-atender">Marcar pedido hecho</h2>
@@ -886,6 +1049,7 @@
   <script src="js/vistas/panel.js"></script>
   <script src="js/vistas/clientes.js"></script>
   <script src="js/vistas/alertas.js"></script>
+  <script src="js/vistas/prediccion.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

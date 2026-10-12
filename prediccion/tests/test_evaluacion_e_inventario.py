@@ -129,7 +129,8 @@ class TestOrigenMovil:
     def test_el_resumen_redondea_a_tres_decimales(self):
         resumen = evaluar_serie(modelos.MEDIA_MOVIL, serie_con_tendencia()).resumen()
 
-        assert set(resumen) == {"modelo", "rmsse", "wape", "sesgo"}
+        assert set(resumen) == {"modelo", "modeloNombre", "rmsse", "wape", "sesgo"}
+        assert resumen["modeloNombre"] == "Media móvil de 8 semanas"
         assert resumen["rmsse"] == round(resumen["rmsse"], 3)
 
 

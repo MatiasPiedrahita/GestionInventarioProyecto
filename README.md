@@ -13,7 +13,7 @@ Proyecto de semestre de **Ingeniería de Software (UPB, 2026-2)**. Es una aplica
 
 ## Estado del proyecto
 
-El repositorio cubre los **Sprints 1 y 2 completos** y el **Sprint 3**: alertas de stock bajo y predicción de demanda (el modelo y su integración; la vista con gráficos y reportes está en curso).
+El repositorio cubre los **Sprints 1 y 2 completos** y el **Sprint 3**: alertas de stock bajo y predicción de demanda. Las nueve historias del plan están implementadas.
 
 | Sprint | ID | Historia de usuario | Rol | Estado |
 |---|---|---|---|---|
@@ -25,7 +25,7 @@ El repositorio cubre los **Sprints 1 y 2 completos** y el **Sprint 3**: alertas 
 | 2 | HU-06 | Ver listado de órdenes de trabajo | Recepcionista | ✅ |
 | 2 | HU-07 | Actualización del estado de órdenes | Mecánico | ✅ |
 | 3 | HU-08 | Alertas de stock bajo | Dueño | ✅ |
-| 3 | HU-09 | Predicción de demanda de repuestos | Administrador | Modelo e integración ✅ · vista y reportes en curso |
+| 3 | HU-09 | Predicción de demanda de repuestos | Administrador | ✅ |
 
 ### Criterios de aceptación y su prueba automática
 
@@ -49,8 +49,8 @@ Cada historia tiene una prueba de aceptación escrita como **Dado / Cuando / Ent
 
 | Rol | Al iniciar sesión entra a | Puede |
 |---|---|---|
-| **Dueño del taller** | Panel | **Panel del taller:** valor del inventario, stock por reponer, órdenes por semana, costo de repuestos por mes, repuestos más usados y trabajo por mecánico. **Alertas de stock:** recibe el aviso en la campana (y por correo si lo activa) cuando un repuesto llega a su mínimo, y marca cuándo ya hizo el pedido. **Reasignar** órdenes a otro mecánico y registrar **entradas de mercancía**. Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas. Cambiar el estado de cualquier orden y **reabrir** las que ya se cerraron. Entra también al panel de administración y es el **único** que crea o modifica dueños y administradores |
-| **Administrador** | Administración | **Panel de administración:** crear usuarios (mecánicos y recepcionistas), editarlos, activarlos o desactivarlos, asignarles una contraseña temporal, cerrar sus sesiones y desbloquearlos; consultar la auditoría y el estado del sistema. Además ve el panel del taller y las alertas de stock, gestiona el inventario y las órdenes, reasigna órdenes y revisa la bandeja de salida de correos. No puede tocar cuentas de dueño ni de otros administradores |
+| **Dueño del taller** | Panel | **Panel del taller:** valor del inventario, stock por reponer, órdenes por semana, costo de repuestos por mes, repuestos más usados y trabajo por mecánico. **Alertas de stock:** recibe el aviso en la campana (y por correo si lo activa) cuando un repuesto llega a su mínimo, y marca cuándo ya hizo el pedido. **Predicción:** qué pedir hoy por proveedor (exportable a Excel), cuánto invertir, qué repuestos tienen plata quieta y el pronóstico de cada uno. **Reasignar** órdenes a otro mecánico y registrar **entradas de mercancía**. Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas. Cambiar el estado de cualquier orden y **reabrir** las que ya se cerraron. Entra también al panel de administración y es el **único** que crea o modifica dueños y administradores |
+| **Administrador** | Administración | **Panel de administración:** crear usuarios (mecánicos y recepcionistas), editarlos, activarlos o desactivarlos, asignarles una contraseña temporal, cerrar sus sesiones y desbloquearlos; consultar la auditoría y el estado del sistema. **Predicción de demanda:** ejecuta el modelo, elige el horizonte y el nivel de servicio, y revisa su precisión. Además ve el panel del taller y las alertas de stock, gestiona el inventario y las órdenes, reasigna órdenes y revisa la bandeja de salida de correos. No puede tocar cuentas de dueño ni de otros administradores |
 | **Mecánico** | Órdenes de trabajo (tablero) | **Mi resumen:** sus órdenes abiertas, las que cerró y los repuestos que usó en 30 días. Crear órdenes, que quedan a su nombre. Ver **solo sus** órdenes. Registrar repuestos usados (se descuentan del stock) y escribir notas de la reparación. Finalizar o cancelar sus órdenes desde el tablero. **Avisar al dueño** cuando un repuesto falta o no sirve para un trabajo. Recibe en la campana las órdenes que le asignan. Consultar el inventario, pero no modificarlo. No ve el directorio de clientes |
 | **Recepcionista** | Órdenes de trabajo | **Recibir vehículos:** crea la orden eligiendo el mecánico; al escribir el documento o la placa de alguien conocido, el formulario se completa solo. **Clientes y vehículos:** buscar por nombre, documento, teléfono o placa, corregir el contacto y ver el historial de cada vehículo. Consultar el listado global con filtros. No registra repuestos ni notas, ni cambia estados |
 | **Todos** | — | "Mi cuenta": cambiar su contraseña, cerrar su sesión en todos los dispositivos y elegir si quiere los avisos también por correo. **Campana** de notificaciones |
@@ -137,7 +137,8 @@ Abra **http://localhost:3000** e inicie sesión. La base de datos se crea en `da
 5. Intentar entrar a `http://localhost:3000/#inventario`: lo devuelve a órdenes, porque no es su vista.
 6. Entrar como **`recepcion`**: filtrar por placa `ABC123` (solo salen esas), por estado "Históricas" y por mecánico. Crear una orden escribiendo un documento que ya exista: el nombre y el teléfono se completan solos. En "Clientes", buscar por placa y abrir la ficha.
 7. Como **`mecanico1`**, registrar repuestos hasta dejar uno en su mínimo. Entrar como **`dueno`**: la campana muestra el aviso y la sección "Alertas" lo lista. En "Mi cuenta" activar los avisos por correo, repetir con otro repuesto y ver el correo simulado en Administración > Sistema.
-8. Como **`dueno`**: en Inventario, abrir el historial del repuesto usado y ver los movimientos "Usado en la orden #N" y "Devuelto al cancelar la orden #N". En Órdenes, reabrir una orden finalizada.
+8. Con el historial de demostración cargado (`npm run seed:historial`), entrar como **`admin`** a "Predicción": revisar las compras sugeridas, exportarlas a CSV, y en "Todos los repuestos" abrir el pronóstico de las plumillas (`PLU-LIM-010`), que sube al llegar la temporada de lluvias. Usar el punto de reorden sugerido como stock mínimo.
+9. Como **`dueno`**: en Inventario, abrir el historial del repuesto usado y ver los movimientos "Usado en la orden #N" y "Devuelto al cancelar la orden #N". En Órdenes, reabrir una orden finalizada.
 
 ---
 
@@ -149,13 +150,13 @@ npm run test:cobertura   # con reporte de cobertura
 npm run test:python      # pruebas del modelo de predicción (pytest); antes: npm run prediccion:instalar -- --dev
 ```
 
-Resultado actual: **643 pruebas de la aplicación (Jest) en 49 suites y 184 del modelo (pytest), todas en verde.**
+Resultado actual: **686 pruebas de la aplicación (Jest) en 51 suites y 184 del modelo (pytest), todas en verde.**
 
 | Tipo | Carpeta | Qué verifican |
 |---|---|---|
 | Aceptación | `tests/aceptacion/` | Un archivo por historia, con escenarios Dado/Cuando/Entonces |
 | Integración | `tests/integration/` | La API completa (HTTP, lógica y base de datos en memoria): login y sesiones, permisos por rol, inventario, órdenes, repuestos usados, notas, cambios de estado, filtros, paginación, índices, migraciones, respuestas de error seguridad (bloqueo por intentos, cambio de contraseña, cabeceras, auditoría), administración de usuarios, panel del taller, directorio de clientes, alertas de stock y notificaciones (en la aplicación y por correo) |
-| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", panel de administración, panel del taller con sus gráficos, recepción (clientes, vehículos y autocompletado), campana de notificaciones, alertas de stock, tablero Kanban y cambio de estado |
+| Interfaz | `tests/interfaz/` | La pantalla real (`public/`) cargada en un navegador simulado (jsdom) y conectada a la API: inicio de sesión, menú por rol, "Mi cuenta", panel de administración, panel del taller con sus gráficos, recepción (clientes, vehículos y autocompletado), campana de notificaciones, alertas de stock, predicción (cálculo, reportes, gráfico de pronóstico y exportación), tablero Kanban y cambio de estado |
 | Contrato | `tests/integration/prediccion.python.test.js` | La aplicación ejecuta el modelo real de Python y guarda su respuesta: si alguno de los dos lados cambia el formato, falla. Se omite con un aviso si no hay entorno de Python; en el pipeline es obligatoria |
 | Modelo (Python) | `prediccion/tests/` | El modelo de predicción: series, patrones de demanda, cada modelo de pronóstico, evaluación con origen móvil, política de inventario, clasificación ABC, contrato y línea de comandos |
 | Unitarias | `tests/unit/` | Validadores (repuesto, orden, repuestos usados, filtros, cambio de estado), reglas de transición y de alertas, tareas programadas, lector de CSV, política y hash de contraseñas, y limitador de intentos |
@@ -282,6 +283,8 @@ Todas las rutas, salvo `/api/salud` y `/api/auth/login`, exigen la cabecera `Aut
 | GET | `/api/prediccion/estado` | Dueño, admin | Si hay una ejecución en curso y cuál fue la última |
 | GET | `/api/prediccion/resumen` | Dueño, admin | La última predicción: un resultado por repuesto (modelo, demanda, punto de reorden, cantidad sugerida, fecha de quiebre) |
 | GET | `/api/prediccion/repuestos/:id` | Dueño, admin | Pronóstico semana a semana con su intervalo e historia de consumo, para el gráfico |
+| GET | `/api/prediccion/reportes` | Dueño, admin | Compras sugeridas por proveedor, clasificación ABC, repuestos sin movimiento y precisión del modelo |
+| GET | `/api/prediccion/reportes/compras.csv` | Dueño, admin | Las compras sugeridas como archivo para Excel |
 | GET | `/api/prediccion/ejecuciones[/:id]` | Dueño, admin | Historial de ejecuciones: duración, versión del modelo, error si falló |
 | PATCH | `/api/repuestos/:id/minimo-sugerido` | Dueño, admin | Pone como stock mínimo el punto de reorden que calculó el modelo |
 | GET | `/api/panel/resumen` | Dueño, admin | Indicadores del negocio: inventario, órdenes por semana, costo de repuestos por mes, más usados y trabajo por mecánico |
@@ -318,6 +321,7 @@ Todos los errores tienen la misma forma:
 - **Cómo se ejecuta:** el dueño o el administrador la lanzan cuando quieran, y una tarea programada la recalcula cada 24 horas. La aplicación extrae los datos, ejecuta el paquete de Python como un proceso aparte y guarda el resultado. Solo corre una ejecución a la vez.
 - **Integración con las alertas:** si un repuesto está por encima de su mínimo pero, al ritmo previsto, se agotaría antes de que alcance a llegar un pedido, se abre la alerta **"Se agotará pronto"** y se avisa al dueño. Además, cada alerta de stock muestra la cantidad que el modelo sugiere pedir.
 - **Días de reposición:** cada repuesto guarda cuántos días tarda en llegar su pedido (7 por defecto). Se edita en el inventario.
+- **Vista "Predicción":** cinco reportes sobre el mismo cálculo. *Compras sugeridas* (qué pedir hoy, por proveedor, exportable a CSV), *Todos los repuestos* (con el gráfico de historia y pronóstico de cada uno), *Clasificación ABC*, *Sin movimiento* (plata quieta) y *Precisión del modelo* (cuánto error ahorra frente a repetir la última semana).
 - **Sin Python instalado** la aplicación funciona igual; la predicción queda como fallida con un mensaje que dice cómo instalarlo (`npm run prediccion:instalar`).
 
 ### Seguridad
@@ -379,7 +383,7 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 - Endurecer la seguridad: límite de intentos de inicio de sesión, cambio de contraseña, cabeceras, auditoría.
 - Proponer qué puede hacer cada rol y construir el panel de administración, el panel del taller con sus gráficos y las funciones de recepción.
 - Construir las alertas de stock bajo con notificaciones en la aplicación y por correo.
-- Integrar el modelo con la aplicación (ejecución, almacenamiento, alertas).
+- Integrar el modelo con la aplicación (ejecución, almacenamiento, alertas) y construir la vista de predicción con sus reportes y gráficos.
 - Programar el modelo de predicción en Python (`prediccion/`) y sus pruebas, a partir del enfoque que definió el equipo: series de tiempo sobre el historial de consumo, con modelos propios de demanda intermitente.
 - Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.
