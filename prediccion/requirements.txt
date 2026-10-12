@@ -1,4 +1,4 @@
 # Librerías del modelo de predicción (Python 3.11 o superior).
 numpy>=2.0
 pandas>=2.2
-statsmodels>=0.14.4
+statsmodels>=0.15.0
