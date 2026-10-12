@@ -47,13 +47,46 @@ Cada historia tiene una prueba de aceptación escrita como **Dado / Cuando / Ent
 
 ### Qué puede hacer cada rol
 
-| Rol | Al iniciar sesión entra a | Puede |
+| Rol | Al iniciar sesión entra a | En una frase |
 |---|---|---|
-| **Dueño del taller** | Panel | **Panel del taller:** valor del inventario, stock por reponer, órdenes por semana, costo de repuestos por mes, repuestos más usados y trabajo por mecánico. **Alertas de stock:** recibe el aviso en la campana (y por correo si lo activa) cuando un repuesto llega a su mínimo, y marca cuándo ya hizo el pedido. **Predicción:** qué pedir hoy por proveedor (exportable a Excel), cuánto invertir, qué repuestos tienen plata quieta y el pronóstico de cada uno. **Reasignar** órdenes a otro mecánico y registrar **entradas de mercancía**. Gestionar el inventario (crear, editar, dar de baja, importar CSV, ver historial). Crear órdenes asignándolas a un mecánico. Ver todas las órdenes y trabajar en ellas. Cambiar el estado de cualquier orden y **reabrir** las que ya se cerraron. Entra también al panel de administración y es el **único** que crea o modifica dueños y administradores |
-| **Administrador** | Administración | **Panel de administración:** crear usuarios (mecánicos y recepcionistas), editarlos, activarlos o desactivarlos, asignarles una contraseña temporal, cerrar sus sesiones y desbloquearlos; consultar la auditoría y el estado del sistema. **Predicción de demanda:** ejecuta el modelo, elige el horizonte y el nivel de servicio, y revisa su precisión. Además ve el panel del taller y las alertas de stock, gestiona el inventario y las órdenes, reasigna órdenes y revisa la bandeja de salida de correos. No puede tocar cuentas de dueño ni de otros administradores |
-| **Mecánico** | Órdenes de trabajo (tablero) | **Mi resumen:** sus órdenes abiertas, las que cerró y los repuestos que usó en 30 días. Crear órdenes, que quedan a su nombre. Ver **solo sus** órdenes. Registrar repuestos usados (se descuentan del stock) y escribir notas de la reparación. Finalizar o cancelar sus órdenes desde el tablero. **Avisar al dueño** cuando un repuesto falta o no sirve para un trabajo. Recibe en la campana las órdenes que le asignan. Consultar el inventario, pero no modificarlo. No ve el directorio de clientes |
-| **Recepcionista** | Órdenes de trabajo | **Recibir vehículos:** crea la orden eligiendo el mecánico; al escribir el documento o la placa de alguien conocido, el formulario se completa solo. **Clientes y vehículos:** buscar por nombre, documento, teléfono o placa, corregir el contacto y ver el historial de cada vehículo. Consultar el listado global con filtros. No registra repuestos ni notas, ni cambia estados |
-| **Todos** | — | "Mi cuenta": cambiar su contraseña, cerrar su sesión en todos los dispositivos y elegir si quiere los avisos también por correo. **Campana** de notificaciones |
+| **Dueño del taller** | Panel del taller | Ve el negocio, decide las compras y es el único que administra a dueños y administradores |
+| **Administrador** | Administración | Administra usuarios, audita el sistema y maneja la predicción de demanda |
+| **Mecánico** | Tablero de sus órdenes | Trabaja sus órdenes: repuestos, notas y estado |
+| **Recepcionista** | Órdenes de trabajo | Recibe los vehículos y atiende a los clientes |
+
+**Dueño del taller**
+
+- **Panel del taller:** valor del inventario, stock por reponer, órdenes por semana, costo de repuestos por mes, repuestos más usados, trabajo por mecánico y compras sugeridas.
+- **Alertas de stock:** recibe el aviso en la campana (y por correo si lo activa) y marca cuándo ya hizo el pedido.
+- **Predicción:** qué pedir hoy por proveedor (exportable a Excel), cuánto invertir, qué repuestos tienen plata quieta y el pronóstico de cada uno.
+- **Órdenes:** las ve todas, las crea asignando el mecánico, cambia su estado, **reabre** las cerradas y las **reasigna** a otro mecánico.
+- **Inventario:** crear, editar, dar de baja, importar CSV, registrar **entradas de mercancía** y ver el historial.
+- **Cuentas:** entra al panel de administración y es el **único** que crea o modifica dueños y administradores.
+
+**Administrador**
+
+- **Panel de administración:** crea usuarios (mecánicos y recepcionistas), los edita, activa o desactiva, les asigna una contraseña temporal, cierra sus sesiones y los desbloquea.
+- **Auditoría y sistema:** consulta quién hizo qué, el estado del sistema, las tareas programadas y la bandeja de salida de correos.
+- **Predicción de demanda:** ejecuta el modelo, elige el horizonte y el nivel de servicio, y revisa su precisión.
+- También ve el panel del taller y las alertas, y gestiona el inventario y las órdenes.
+- **No puede** tocar cuentas de dueño ni de otros administradores, ni asignar esos roles.
+
+**Mecánico**
+
+- **Tablero Kanban** con sus órdenes y **Mi resumen** (órdenes abiertas, cerradas y repuestos usados en 30 días).
+- Crea órdenes, que quedan a su nombre. Registra repuestos usados (se descuentan del stock) y escribe notas.
+- **Finaliza o cancela** sus órdenes. **Avisa al dueño** cuando un repuesto falta o no sirve para un trabajo.
+- Recibe en la campana las órdenes que le asignan.
+- **No puede** ver órdenes de otros mecánicos, reabrir órdenes, modificar el inventario ni consultar el directorio de clientes.
+
+**Recepcionista**
+
+- **Recibe vehículos:** crea la orden eligiendo el mecánico. Con un documento o una placa ya registrados, el formulario se completa solo.
+- **Clientes y vehículos:** busca por nombre, documento, teléfono o placa, corrige el contacto y ve el historial de cada vehículo.
+- Consulta el listado global de órdenes con filtros.
+- **No puede** registrar repuestos ni notas, cambiar estados ni gestionar el inventario.
+
+**Todos los roles** tienen "Mi cuenta" (cambiar la contraseña, cerrar la sesión en todos los dispositivos, elegir si quieren los avisos también por correo) y la **campana** de notificaciones.
 
 Reglas de protección de las cuentas: nadie se desactiva ni se cambia el rol a sí mismo; siempre queda al menos un dueño activo; un mecánico con órdenes en proceso no se puede desactivar ni cambiar de rol hasta reasignarlas.
 
@@ -339,7 +372,16 @@ Todos los errores tienen la misma forma:
 | Dependencias | `npm audit` en cada push y Dependabot cada semana |
 | Secretos | Ninguno en el repositorio: `.env`, la base de datos y las contraseñas de ejemplo quedan fuera |
 
-**Limitaciones conocidas:** el bloqueo por intentos permite que alguien bloquee a propósito la cuenta de otro durante 15 minutos (se prefiere eso a dejar adivinar contraseñas). La aplicación no cifra el tráfico por sí misma: fuera de la red local debe ir detrás de HTTPS.
+**Límites de estas medidas:** el bloqueo por intentos permite que alguien bloquee a propósito la cuenta de otro durante 15 minutos (se prefiere eso a dejar adivinar contraseñas). La aplicación no cifra el tráfico por sí misma: fuera de la red local debe ir detrás de HTTPS.
+
+### Limitaciones conocidas
+
+- **Un solo escritor.** SQLite admite una escritura a la vez. Para un taller es suficiente; pasar a PostgreSQL implicaría reescribir los repositorios (`*.repository.js`), no los servicios ni las rutas.
+- **Fechas en UTC.** Los reportes por semana y por mes agrupan con la hora universal: una orden cerrada un domingo después de las 7 p. m. (hora de Colombia) cuenta en la semana siguiente.
+- **El correo es simulado** mientras no se configure un servidor SMTP en el `.env`.
+- **El modelo de predicción** no usa variables externas (festivos, precios), modela cada repuesto por separado y necesita al menos 12 semanas de historia para poder medirse. Sus límites están en [`prediccion/README.md`](prediccion/README.md).
+- **Las pruebas de interfaz** usan un navegador simulado (jsdom): verifican el comportamiento, no el aspecto visual.
+- **Sin HTTPS propio.** Fuera de la red local, la aplicación debe ir detrás de un servidor que cifre el tráfico.
 
 ---
 
@@ -358,6 +400,8 @@ Según el plan de sprints:
 | Notas | Endpoint de notas | Campo en la tabla de órdenes, campo de texto |
 | Listado de órdenes | Índices, tabla con barra de búsqueda | API con paginación y filtros |
 | Estado de órdenes | Endpoint de cambio de estado, tablero Kanban | Historial de estados, devolución de repuestos |
+| Alertas de stock | Tarea programada, servicio de notificaciones | Vista de alertas, avisos por correo |
+| Predicción de demanda | Modelo de series de tiempo en Python, pipeline de datos | Integración con la aplicación, gráficos y reportes |
 
 El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests se trabajaron entre los dos.
 
@@ -379,12 +423,14 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 **Para qué la usamos:**
 
 - Proponer la arquitectura por capas y la estructura de carpetas a partir de nuestros diagramas (clases, componentes, C4).
-- Generar el código de las historias HU-01 a HU-07: autenticación y roles, inventario, órdenes, repuestos usados, notas, listado con filtros, cambio de estado con tablero Kanban, migraciones de la base de datos e interfaz web.
+- Generar el código de las nueve historias (HU-01 a HU-09): autenticación y roles, inventario, órdenes, repuestos usados, notas, listado con filtros, cambio de estado con tablero Kanban, alertas, predicción, migraciones de la base de datos e interfaz web.
 - Endurecer la seguridad: límite de intentos de inicio de sesión, cambio de contraseña, cabeceras, auditoría.
 - Proponer qué puede hacer cada rol y construir el panel de administración, el panel del taller con sus gráficos y las funciones de recepción.
 - Construir las alertas de stock bajo con notificaciones en la aplicación y por correo.
+- Diseñar y programar el modelo de predicción en Python (`prediccion/`) y sus pruebas. El equipo pidió un modelo de series de tiempo sobre el historial de consumo, hecho en Python; la elección de los modelos (suavizado exponencial, Holt, estacional, Croston, SBA, TSB), de la métrica (RMSSE) y de la política de inventario la propuso la IA y está justificada en el ADR-19.
 - Integrar el modelo con la aplicación (ejecución, almacenamiento, alertas) y construir la vista de predicción con sus reportes y gráficos.
-- Programar el modelo de predicción en Python (`prediccion/`) y sus pruebas, a partir del enfoque que definió el equipo: series de tiempo sobre el historial de consumo, con modelos propios de demanda intermitente.
+- Proponer las decisiones de diseño registradas en los ADR-12 a ADR-21.
+- Desde la HU-07: crear las ramas, los commits y los pull requests desde la cuenta de un integrante, y fusionarlos cuando el pipeline quedó en verde.
 - Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.
 - Redactar este README y la documentación en `docs/`.
@@ -392,8 +438,9 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 **Qué hizo el equipo:**
 
 - Definir el problema, las historias de usuario, la priorización MoSCoW, los criterios de aceptación y el plan de sprints con su reparto de tareas.
-- Revisar, ejecutar y entender todo el código generado antes de subirlo, y ajustarlo donde fue necesario.
-- Organizar el trabajo en ramas, commits y pull requests, y revisar el código.
+- Decidir el alcance de cada etapa y resolver las decisiones que cambiaban lo acordado (por ejemplo, que la recepcionista pueda crear órdenes, o cómo integrar el modelo de Python).
+- HU-01 a HU-06: revisar, ejecutar y entender el código antes de subirlo, y organizar el trabajo en ramas, commits y pull requests revisados por el otro integrante.
+- HU-07 en adelante: los pull requests se fusionaron con las pruebas automáticas y el pipeline en verde, sin la aprobación de un segundo integrante en el pull request.
 
 **Responsabilidad:** el equipo entiende el código entregado, puede explicarlo y es responsable de su contenido. La IA se usó como apoyo y no reemplazó nuestro criterio ni nuestra revisión.
 
