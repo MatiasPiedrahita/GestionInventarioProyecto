@@ -12,7 +12,7 @@ Este documento explica **por qué** el código está organizado así. Los diagra
 | Secuencia | El flujo "registrar repuestos y descontar stock" sigue el diagrama: API de órdenes → inventario → base de datos, en una sola transacción |
 | Casos de uso | "Gestionar inventario de repuestos" y su `<<include>>` "Descontar stock" desde la orden |
 
-Del Sprint 3 ya existen la *Tarea Programada* (`src/tareas/programador.js`, que revisa el stock) y la conexión con el servicio externo de correo (`modules/notificaciones/correo.js`, simulado o SMTP). Falta el *Servicio de Predicción*.
+Del Sprint 3 ya existen la *Tarea Programada* (`src/tareas/programador.js`, que revisa el stock) y la conexión con el servicio externo de correo (`modules/notificaciones/correo.js`, simulado o SMTP). El *Servicio de Predicción* es el paquete de Python de `prediccion/`, que la API ejecuta como un proceso aparte (ADR-19 y ADR-20).
 
 ## Decisiones (ADR resumidos)
 
@@ -173,13 +173,28 @@ Del Sprint 3 ya existen la *Tarea Programada* (`src/tareas/programador.js`, que 
 - **Historial de demostración.** `npm run seed:historial` simula dos años y medio de trabajo con patrones conocidos (tendencia, temporadas, baja rotación, un repuesto descontinuado). Usa los servicios de la aplicación, así que cada unidad pasa por una orden y deja su movimiento; solo las fechas se corrigen después.
 - **Límites conocidos:** no usa variables externas (festivos, precios), modela cada repuesto por separado y el intervalo no se ensancha con el horizonte. Están documentados en `prediccion/README.md`.
 
+### ADR-20 · Integración del modelo: proceso por lotes en lugar de un servicio web aparte
+
+- **Contexto:** el diagrama de despliegue y el ADR-01 preveían un "Servicio de Predicción" como contenedor independiente. La forma habitual de hacerlo sería un servicio web en Python (FastAPI) al que la API de Node llama por HTTP.
+- **Decisión:** la API ejecuta el modelo como un **proceso aparte por cada cálculo** (`motor-python.js`): lanza `python -m taller_prediccion`, le entrega un JSON por la entrada estándar y lee otro por la salida estándar. Los resultados se guardan en tablas y la interfaz los lee de ahí.
+- **Por qué:** la predicción es un cálculo por lotes (una vez al día y cuando alguien lo pide), no una consulta que deba responder al instante. Un servicio web obligaría a levantar y vigilar un segundo servidor, a definir puertos y a manejar qué pasa si está caído. Así el proyecto se levanta con un solo `npm start`, y quien no tenga Python puede usar todo lo demás.
+- **Qué se conserva del diagrama:** el modelo sigue siendo un componente aislado, con su propio lenguaje, sus dependencias y un contrato versionado. Si el taller creciera y hiciera falta un servicio web, el contrato es el mismo: bastaría envolverlo.
+- **El SQL sigue solo en los repositorios.** `consumo.repository.js` extrae el consumo semanal; el modelo nunca abre la base. Con SQLite (un solo escritor) esto evita además que dos procesos escriban a la vez.
+- **Fuente del consumo:** el detalle de las órdenes que no fue devuelto. Equivale a los movimientos `USO_EN_ORDEN` menos las `DEVOLUCION`, pero descuenta la semana en que se usó el repuesto y no la semana en que se canceló la orden.
+- **Seguridad del proceso:** se usa `spawn` sin intérprete de comandos y con argumentos fijos, así que los datos nunca se convierten en parte de una orden del sistema. Hay tiempo límite (5 minutos) y tope de tamaño de la respuesta.
+- **Asíncrono y sin bloqueos:** `POST /api/prediccion/ejecuciones` responde `202` y el cálculo sigue aparte; la interfaz consulta el estado. Solo corre una ejecución a la vez (`409` si ya hay una). Una ejecución que quedó "en curso" porque el servidor se apagó se da por perdida a los 15 minutos y no bloquea las siguientes.
+- **Los fallos se explican.** Si falta Python o una librería, la ejecución queda como fallida con un mensaje que dice qué instalar; el detalle técnico va al registro del servidor. La tarea programada comprueba primero que el modelo esté disponible, para no llenar el historial de fallos en cada arranque.
+- **Trazabilidad:** cada ejecución guarda quién la lanzó, sus parámetros, cuánto tardó y con qué versión del modelo, de Python y de las librerías se calculó. Se conservan las últimas 12.
+- **Integración con las alertas:** el modelo informa qué repuestos se agotarían antes de poder reponerlos. El servicio de alertas abre para ellos la alerta `QUIEBRE_PROYECTADO`, la actualiza en cada ejecución y la cierra cuando deja de proyectarse o cuando el stock llega de verdad a su mínimo (ahí manda la alerta real).
+- **Cómo se prueba:** las pruebas de la aplicación usan un motor simulado que respeta el contrato, y una **prueba de contrato** ejecuta el modelo real de punta a punta. En el pipeline esa prueba es obligatoria.
+
 ## Requisitos no funcionales cubiertos
 
 | RNF | Cómo se atiende |
 |---|---|
 | Facilidad de uso | Una sola pantalla, mensajes de error junto a cada campo y textos en lenguaje del taller |
-| Velocidad (< 2 s) | Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
+| Velocidad (< 2 s) | La predicción se calcula aparte y se guarda: consultarla es leer una tabla. Consultas preparadas, índices para los filtros del listado y paginación (máximo 50 por página) |
 | Compatibilidad | Web estándar, sin instalar nada en el taller; diseño responsive para PC y tablet |
 | Mantenimiento | Capas y módulos separados, código comentado, migraciones versionadas, más de 700 pruebas (unitarias, integración, aceptación, interfaz y del modelo en Python) y CI |
-| Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `panel`, `clientes`, `inventario`, `ordenes`, `alertas`, `notificaciones`) conectados por eventos; el siguiente será `prediccion` |
+| Crecimiento a futuro | Módulos por dominio (`auth`, `usuarios`, `auditoria`, `sistema`, `panel`, `clientes`, `inventario`, `ordenes`, `alertas`, `notificaciones`, `prediccion`) conectados por eventos, más un modelo en Python aislado detrás de un contrato |
 | Seguridad | Contraseñas con `scrypt`, sesiones con vencimiento, bloqueo por intentos fallidos, permisos por rol y por propiedad en la API, cabeceras con CSP, auditoría, consultas parametrizadas y ningún secreto en el repositorio (ADR-08, ADR-09, ADR-14) |
