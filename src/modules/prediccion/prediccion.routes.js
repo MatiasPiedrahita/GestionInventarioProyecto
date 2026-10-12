@@ -27,6 +27,17 @@ function crearRutasPrediccion(servicio) {
     res.json(servicio.resumen());
   });
 
+  router.get('/reportes', (req, res) => {
+    res.json(servicio.reportes());
+  });
+
+  router.get('/reportes/compras.csv', (req, res) => {
+    const { nombre, contenido } = servicio.comprasCsv();
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="${nombre}"`);
+    res.send(contenido);
+  });
+
   router.get('/repuestos/:id', (req, res) => {
     res.json(servicio.detalle(leerId(req)));
   });
