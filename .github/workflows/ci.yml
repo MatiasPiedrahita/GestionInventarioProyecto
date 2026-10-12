@@ -32,11 +32,26 @@ jobs:
       - name: Instalar dependencias (exactas, desde package-lock.json)
         run: npm ci
 
+      # La prueba de contrato y la de aceptación de la HU-09 ejecutan el modelo real.
+      - name: Instalar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: prediccion/requirements.txt
+
+      - name: Instalar las librerías del modelo de predicción
+        run: pip install -r prediccion/requirements.txt
+
       - name: Build (verificación de sintaxis y construcción de la app)
         run: npm run build
 
       - name: Ejecutar pruebas con cobertura
         run: npm run test:cobertura
+        env:
+          # En el pipeline el modelo de Python es obligatorio: si falta, las pruebas fallan en vez de omitirse.
+          EXIGIR_PYTHON: '1'
+          PYTHON_BIN: python
 
       - name: Publicar reporte de cobertura
         if: always()
