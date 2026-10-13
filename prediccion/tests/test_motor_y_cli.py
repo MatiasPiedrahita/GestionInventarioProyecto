@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from taller_prediccion import VERSION_DEL_CONTRATO, __version__, modelos, patrones
+from taller_prediccion import VERSION_DEL_CONTRATO, __version__, inventario, modelos, patrones
 from taller_prediccion.contrato import EntradaInvalida, validar
 from taller_prediccion.motor import SIN_HISTORIA, predecir
 
@@ -171,6 +171,26 @@ class TestMotor:
 
         assert resultado["modelo"] == modelos.ESTACIONAL
         assert np.mean(por_mes["12"]) > 1.8 * np.mean(por_mes["11"])
+
+    @pytest.mark.parametrize("corte", ["2026-10-12", "2026-10-15", "2026-10-18"])  # lunes, jueves y domingo
+    def test_la_politica_se_puede_repetir_con_lo_que_se_publica(self, corte, generador):
+        # La aplicación recalcula las decisiones con el pronóstico publicado y el stock del día.
+        # Con el mismo stock y la misma fecha tiene que llegar exactamente a lo que dijo el modelo.
+        from datetime import date
+
+        valores = generador.poisson(6, 90).astype(float)
+        resultado = predecir(entrada(repuesto(1, valores, stockActual=9, diasDeReposicion=10), fechaDeCorte=corte))["repuestos"][0]
+        publicado = np.array([punto["unidades"] for punto in resultado["pronostico"]])
+        desfase = date.fromisoformat(corte).weekday()
+
+        en_reposicion = inventario.demanda_en_dias(publicado, 10, desfase)
+        objetivo = inventario.demanda_en_dias(publicado, 10 + inventario.DIAS_DE_COBERTURA, desfase) + resultado["stockDeSeguridad"]
+
+        assert resultado["demandaTotal"] == pytest.approx(publicado.sum(), abs=0.005)
+        assert resultado["demandaEnReposicion"] == pytest.approx(en_reposicion, abs=0.005)
+        assert resultado["puntoDeReorden"] == int(np.ceil(en_reposicion + resultado["stockDeSeguridad"] - 1e-9))
+        assert resultado["cantidadSugerida"] == max(int(np.ceil(objetivo - 9 - 1e-9)), resultado["puntoDeReorden"] + 1 - 9)
+        assert resultado["diasDeCobertura"] == inventario.dias_hasta_el_quiebre(publicado, 9, desfase)
 
     def test_repuesto_de_baja_rotacion_se_clasifica_y_pronostica_como_intermitente(self):
         resultado = uno(serie_intermitente(cada=4, cantidad=3), stockActual=2, diasDeReposicion=14)
