@@ -60,11 +60,11 @@ describe('Reportes de la predicción (integración, motor simulado)', () => {
       // La correa tiene 58 en stock: no hay que pedirla. El filtro (3 en stock, 7 por semana) sí.
       expect(compras.proveedores).toEqual([{
         proveedor: 'Autopartes del Valle',
-        unidades: 34,
-        total: 969000,
-        items: [expect.objectContaining({ sku: 'FIL-ACE-001', stockActual: 3, cantidad: 34, costoUnitario: 28500, subtotal: 969000, urgente: true })],
+        unidades: 35,
+        total: 997500,
+        items: [expect.objectContaining({ sku: 'FIL-ACE-001', stockActual: 3, cantidad: 35, costoUnitario: 28500, subtotal: 997500, urgente: true })],
       }]);
-      expect(compras).toMatchObject({ repuestos: 1, unidades: 34, urgentes: 1, total: 969000 });
+      expect(compras).toMatchObject({ repuestos: 1, unidades: 35, urgentes: 1, total: 997500 });
     });
 
     test('clasificación ABC, repuestos sin movimiento y precisión del modelo', async () => {
@@ -123,8 +123,8 @@ describe('Reportes de la predicción (integración, motor simulado)', () => {
       const lineas = res.text.replace('﻿', '').trimEnd().split('\r\n');
       expect(res.text.charCodeAt(0)).toBe(0xfeff);
       expect(lineas[0]).toBe('Proveedor;SKU;Repuesto;Stock actual;Se agota el;Cantidad sugerida;Costo unitario;Subtotal');
-      expect(lineas[1]).toMatch(/^Autopartes del Valle;FIL-ACE-001;Filtro de aceite Mann W712;3;\d{4}-\d{2}-\d{2};34;28500;969000$/);
-      expect(lineas[2]).toBe('Total;;;;;34;;969000');
+      expect(lineas[1]).toMatch(/^Autopartes del Valle;FIL-ACE-001;Filtro de aceite Mann W712;3;\d{4}-\d{2}-\d{2};35;28500;997500$/);
+      expect(lineas[2]).toBe('Total;;;;;35;;997500');
     });
 
     test('un nombre de proveedor que parece una fórmula no llega a Excel como fórmula', async () => {

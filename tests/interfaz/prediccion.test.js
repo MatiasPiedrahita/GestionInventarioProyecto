@@ -70,7 +70,7 @@ describe('Interfaz · predicción de demanda integrada con inventario, alertas y
     expect(fila.querySelector('.estado').textContent).toBe('Se agotará pronto');
     expect(fila.querySelector('.estado').className).toContain('alerta--quiebre_proyectado');
     expect(fila.textContent).toContain('al ritmo previsto se agota en 3 días y un pedido tarda 7 días');
-    expect(fila.querySelector('.sugerencia').textContent).toBe('Sugerido: pedir 34');
+    expect(fila.querySelector('.sugerencia').textContent).toBe('Sugerido: pedir 35');
   });
 
   test('sin predicción calculada, las alertas no muestran sugerencia', async () => {
@@ -171,7 +171,7 @@ describe('Interfaz · vista "Predicción": cálculo, reportes y pronóstico por 
 
     expect(indicadores()).toEqual({
       'Repuestos por pedir': '1',
-      'Inversión sugerida': '$ 969.000',
+      'Inversión sugerida': '$ 997.500',
       'Se agotan antes de reponer': '1',
       'Plata quieta': '$ 368.000',
       'Acierto del modelo': '1 de 1',
@@ -185,10 +185,10 @@ describe('Interfaz · vista "Predicción": cálculo, reportes y pronóstico por 
     await abrirVista();
 
     expect(nav.textos('.proveedor__cabecera h3')).toEqual(['Autopartes del Valle']);
-    expect(nav.$('.proveedor__total').textContent.replace(/\s/g, ' ')).toBe('34 unidades · $ 969.000');
+    expect(nav.$('.proveedor__total').textContent.replace(/\s/g, ' ')).toBe('35 unidades · $ 997.500');
     const fila = nav.$('.proveedor tr[data-sku="FIL-ACE-001"]');
     expect(fila.querySelector('.estado').textContent).toBe('Urgente');
-    expect(fila.querySelector('td.fuerte').textContent).toBe('34');
+    expect(fila.querySelector('td.fuerte').textContent).toBe('35');
 
     nav.clic('#boton-exportar-compras');
     await nav.esperar(() => descargas.length === 1, 'la descarga');
@@ -275,7 +275,7 @@ describe('Interfaz · vista "Predicción": cálculo, reportes y pronóstico por 
     expect(ficha['Modelo elegido']).toEqual(['Media móvil de 8 semanas', '20 % menos de error que repetir la última semana']);
     expect(ficha['Stock actual']).toEqual(['3 unidades', 'Alcanza para: 3 días']);
     expect(ficha['Punto de reorden']).toEqual(['8 unidades', 'Incluye 1 de colchón. El pedido tarda 7 días']);
-    expect(ficha['Recomendación']).toEqual(['Pedir 34', 'Se agotaría antes de que llegue el pedido']);
+    expect(ficha['Recomendación']).toEqual(['Pedir 35', 'Se agotaría antes de que llegue el pedido']);
     expect(nav.textos('#cuerpo-comparados tr td:first-child')).toEqual(['Media móvil de 8 semanas (elegido)', 'Última semana']);
     expect(nav.$('#cuerpo-comparados tr').className).toBe('elegido');
     expect(nav.visible('#nota-prediccion')).toBe(false);
@@ -327,7 +327,7 @@ describe('Interfaz · vista "Predicción": cálculo, reportes y pronóstico por 
 
     const titulos = nav.textos('#indicadores-panel .indicador__titulo');
     expect(titulos[4]).toBe('Compras sugeridas');
-    expect(nav.textos('#indicadores-panel .indicador__valor')[4].replace(/\s/g, ' ')).toBe('$ 969.000');
+    expect(nav.textos('#indicadores-panel .indicador__valor')[4].replace(/\s/g, ' ')).toBe('$ 997.500');
   });
 
   test('el mecánico y la recepcionista no tienen la sección de predicción', async () => {

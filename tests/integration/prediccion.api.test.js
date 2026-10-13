@@ -217,7 +217,7 @@ describe('Predicción de demanda: integración con la aplicación (motor simulad
         metricas: { rmsse: 0.8, mejoraSobreIngenuo: 0.2, semanasDePrueba: 52 },
         demandaTotal: 56,
         puntoDeReorden: 8,
-        cantidadSugerida: 34,
+        cantidadSugerida: 35,
         debePedir: true,
         diasDeCobertura: 3,
         quiebreAntesDeReponer: true,
@@ -228,7 +228,7 @@ describe('Predicción de demanda: integración con la aplicación (motor simulad
     });
 
     test('sin ninguna ejecución, el resumen viene vacío y el detalle responde 404 con una explicación', async () => {
-      expect(await resumen()).toEqual({ ejecucion: null, predicciones: [], enCurso: null });
+      expect(await resumen()).toEqual({ ejecucion: null, predicciones: [], pendientes: 0, enCurso: null });
       const detalle = await admin.get(`/api/prediccion/repuestos/${filtro.id}`);
       expect(detalle.status).toBe(404);
       expect(detalle.body.mensaje).toBe('Todavía no se ha ejecutado la predicción de demanda');
@@ -304,6 +304,86 @@ describe('Predicción de demanda: integración con la aplicación (motor simulad
     };
   }
 
+  describe('las decisiones siguen al stock de hoy, sin volver a ejecutar el modelo', () => {
+    test('al registrar mercancía, la recomendación de compra y la alerta se actualizan al instante', async () => {
+      await consumir(filtro, 7, { haceDias: 7 });
+      await ejecutar();
+      const antes = (await resumen()).predicciones[0];
+
+      await dueno.post(`/api/repuestos/${filtro.id}/entradas`).send({ cantidad: 40 });
+
+      const despues = (await resumen()).predicciones[0];
+      expect(antes).toMatchObject({ repuesto: { stockActual: 3 }, debePedir: true, cantidadSugerida: 35, diasDeCobertura: 3, quiebreAntesDeReponer: true });
+      expect(despues).toMatchObject({
+        repuesto: { stockActual: 43 }, stockAlCalcular: 3, debePedir: false, cantidadSugerida: 0, diasDeCobertura: 43, quiebreAntesDeReponer: false,
+      });
+      // El pronóstico es el mismo: solo cambió lo que depende del stock.
+      expect(despues.demandaTotal).toBe(antes.demandaTotal);
+      expect(despues.puntoDeReorden).toBe(antes.puntoDeReorden);
+      expect((await admin.get('/api/prediccion/reportes')).body.compras).toMatchObject({ repuestos: 0, total: 0 });
+      expect((await admin.get(`/api/prediccion/repuestos/${filtro.id}`)).body).toMatchObject({ debePedir: false, diasDeCobertura: 43 });
+      expect(await alertas()).toEqual([]);
+      expect(motor.llamadas).toHaveLength(1);
+    });
+
+    test('al gastar stock en una orden, aparece la alerta "Se agotará pronto" sin esperar a la siguiente ejecución', async () => {
+      await dueno.post(`/api/repuestos/${filtro.id}/entradas`).send({ cantidad: 20 });
+      await consumir(filtro, 7, { haceDias: 7 });
+      await ejecutar();
+      // Quedan 23: alcanza para tres semanas y no hay nada que avisar.
+      expect(await alertas()).toEqual([]);
+      expect((await resumen()).predicciones[0]).toMatchObject({ debePedir: false, diasDeCobertura: 23 });
+
+      await consumir(filtro, 18);
+
+      const [alerta] = await alertas();
+      expect(alerta).toMatchObject({
+        tipo: 'QUIEBRE_PROYECTADO',
+        detalle: 'al ritmo previsto se agota en 5 días y un pedido tarda 7 días. Sugerido: pedir 33.',
+        repuesto: { stockActual: 5 },
+        prediccion: { cantidadSugerida: 33, debePedir: true },
+      });
+      expect((await dueno.get('/api/notificaciones')).body.datos[0]).toMatchObject({ tipo: 'QUIEBRE_PROYECTADO', titulo: 'Se agotará pronto: FIL-ACE-001' });
+      expect((await resumen()).predicciones[0]).toMatchObject({ debePedir: true, cantidadSugerida: 33, quiebreAntesDeReponer: true });
+      expect(motor.llamadas).toHaveLength(1);
+    });
+
+    test('la revisión periódica de alertas no duplica la alerta proyectada ni vuelve a avisar', async () => {
+      await consumir(filtro, 7, { haceDias: 7 });
+      await ejecutar();
+
+      const revision = ctx.servicios.alertas.revisar();
+
+      expect(revision).toMatchObject({ creadas: 0, resueltas: 0 });
+      expect(await alertas()).toHaveLength(1);
+      expect((await dueno.get('/api/notificaciones')).body.noLeidas).toBe(1);
+    });
+
+    test('la alerta de un pedido ya hecho sigue abierta hasta que llega la mercancía', async () => {
+      await consumir(filtro, 7, { haceDias: 7 });
+      await ejecutar();
+      const [alerta] = await alertas();
+      await dueno.patch(`/api/alertas/${alerta.id}/atender`).send({ nota: 'Pedido a Autopartes' });
+
+      ctx.servicios.alertas.revisar();
+      const enEspera = await alertas();
+      await dueno.post(`/api/repuestos/${filtro.id}/entradas`).send({ cantidad: 35 });
+
+      expect(enEspera.map((a) => [a.tipo, a.estado])).toEqual([['QUIEBRE_PROYECTADO', 'ATENDIDA']]);
+      expect(await alertas()).toEqual([]);
+    });
+
+    test('el stock mínimo sugerido es el punto de reorden de hoy', async () => {
+      await consumir(filtro, 7, { haceDias: 7 });
+      await ejecutar();
+      await dueno.post(`/api/repuestos/${filtro.id}/entradas`).send({ cantidad: 40 });
+
+      const res = await dueno.patch(`/api/repuestos/${filtro.id}/minimo-sugerido`);
+
+      expect(res.body).toMatchObject({ stockMinimo: 8, stockActual: 43, bajoStock: false });
+    });
+  });
+
   describe('integración con las alertas de stock', () => {
     test('un repuesto sobre su mínimo que se agotaría antes de reponerlo genera la alerta "Se agotará pronto" y avisa al dueño', async () => {
       await consumir(filtro, 7, { haceDias: 7 });
@@ -316,14 +396,14 @@ describe('Predicción de demanda: integración con la aplicación (motor simulad
         tipo: 'QUIEBRE_PROYECTADO',
         tipoNombre: 'Se agotará pronto',
         estado: 'ACTIVA',
-        detalle: 'al ritmo previsto se agota en 3 días y un pedido tarda 7 días. Sugerido: pedir 34.',
+        detalle: 'al ritmo previsto se agota en 3 días y un pedido tarda 7 días. Sugerido: pedir 35.',
         repuesto: { sku: 'FIL-ACE-001', stockActual: 3, stockMinimo: 1 },
       });
       const { datos } = (await dueno.get('/api/notificaciones')).body;
       expect(datos[0]).toMatchObject({
         tipo: 'QUIEBRE_PROYECTADO',
         titulo: 'Se agotará pronto: FIL-ACE-001',
-        mensaje: 'Filtro de aceite Mann W712: al ritmo previsto se agota en 3 días y un pedido tarda 7 días. Sugerido: pedir 34.',
+        mensaje: 'Filtro de aceite Mann W712: al ritmo previsto se agota en 3 días y un pedido tarda 7 días. Sugerido: pedir 35.',
         vista: 'alertas',
       });
     });
@@ -337,7 +417,7 @@ describe('Predicción de demanda: integración con la aplicación (motor simulad
 
       const abiertas = await alertas();
       expect(abiertas).toHaveLength(1);
-      expect(abiertas[0].detalle).toBe('al ritmo previsto se agota en 1 día y un pedido tarda 7 días. Sugerido: pedir 41.');
+      expect(abiertas[0].detalle).toBe('al ritmo previsto se agota en 1 día y un pedido tarda 7 días. Sugerido: pedir 42.');
       expect((await dueno.get('/api/notificaciones')).body.noLeidas).toBe(1);
     });
 
@@ -378,7 +458,7 @@ describe('Predicción de demanda: integración con la aplicación (motor simulad
 
       const despues = (await alertas())[0].prediccion;
       expect(antes).toBeNull();
-      expect(despues).toMatchObject({ cantidadSugerida: 47, puntoDeReorden: 10, diasDeCobertura: 0.8, debePedir: true });
+      expect(despues).toMatchObject({ cantidadSugerida: 48, puntoDeReorden: 10, diasDeCobertura: 0.8, debePedir: true });
       expect(despues.fechaDeQuiebre).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(despues.calculadaEn).toEqual(expect.any(String));
     });
@@ -430,8 +510,52 @@ describe('Predicción de demanda: integración con la aplicación (motor simulad
       ctx.db.prepare("UPDATE ejecuciones_prediccion SET finalizada_en = datetime('now', '-25 hours')").run();
       const vencida = await ctx.servicios.prediccion.ejecutarSiHaceFalta();
 
-      expect(reciente).toEqual({ ejecutada: false, motivo: 'La predicción vigente tiene menos de un día' });
+      expect(reciente).toEqual({ ejecutada: false, motivo: 'La predicción está vigente' });
       expect(vencida).toEqual({ ejecutada: true, estado: 'COMPLETADA' });
+      expect(motor.llamadas).toHaveLength(2);
+    });
+
+    test('un repuesto nuevo deja la predicción pendiente y la tarea la recalcula aunque sea reciente', async () => {
+      await ejecutar();
+      const alDia = (await resumen()).pendientes;
+
+      const { body: nuevo } = await dueno.post('/api/repuestos').send(repuestoValido({ sku: 'BUJ-NGK-004', nombre: 'Bujía NGK' }));
+      const conNuevo = (await resumen()).pendientes;
+      const resultado = await ctx.servicios.prediccion.ejecutarSiHaceFalta();
+
+      expect([alDia, conNuevo]).toEqual([0, 1]);
+      expect(resultado).toEqual({ ejecutada: true, estado: 'COMPLETADA' });
+      expect(await resumen()).toMatchObject({ pendientes: 0, predicciones: [{ repuesto: { id: nuevo.id } }, { repuesto: { id: filtro.id } }] });
+      expect(motor.llamadas).toHaveLength(2);
+    });
+
+    test('cambiar el tiempo de reposición de un repuesto también obliga a recalcular; darlo de baja, no', async () => {
+      await ejecutar();
+
+      await dueno.put(`/api/repuestos/${filtro.id}`).send(repuestoValido({ stockMinimo: 1, diasReposicion: 15 }));
+      const conOtroPlazo = (await resumen()).pendientes;
+      await ctx.servicios.prediccion.ejecutarSiHaceFalta();
+      const recalculada = await resumen();
+      await dueno.delete(`/api/repuestos/${filtro.id}`);
+
+      expect(conOtroPlazo).toBe(1);
+      expect(recalculada).toMatchObject({ pendientes: 0, predicciones: [{ diasReposicion: 15 }] });
+      expect((await resumen()).pendientes).toBe(0);
+      expect(motor.llamadas[1].repuestos[0].diasDeReposicion).toBe(15);
+    });
+
+    test('si el último intento falló hace poco, no insiste en cada vuelta; una hora después lo reintenta', async () => {
+      iniciarTaller({ falla: new Error('Sin memoria') });
+      await dueno.post('/api/repuestos').send(repuestoValido());
+
+      const primero = await ctx.servicios.prediccion.ejecutarSiHaceFalta();
+      const enseguida = await ctx.servicios.prediccion.ejecutarSiHaceFalta();
+      ctx.db.prepare("UPDATE ejecuciones_prediccion SET iniciada_en = datetime('now', '-61 minutes')").run();
+      const unaHoraDespues = await ctx.servicios.prediccion.ejecutarSiHaceFalta();
+
+      expect(primero).toMatchObject({ ejecutada: true, estado: 'FALLIDA' });
+      expect(enseguida).toEqual({ ejecutada: false, motivo: 'El último intento falló hace menos de una hora' });
+      expect(unaHoraDespues).toMatchObject({ ejecutada: true, estado: 'FALLIDA' });
       expect(motor.llamadas).toHaveLength(2);
     });
 

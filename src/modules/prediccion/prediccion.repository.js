@@ -144,6 +144,20 @@ function crearRepositorioPrediccion(db) {
     deEjecucion: db.prepare(`${SELECT_PREDICCION} WHERE p.ejecucion_id = ? ORDER BY r.nombre COLLATE NOCASE`),
     deRepuesto: db.prepare(`${SELECT_PREDICCION} WHERE p.ejecucion_id = @ejecucionId AND p.repuesto_id = @repuestoId`),
     puntos: db.prepare('SELECT semana, unidades, inferior, superior FROM predicciones_puntos WHERE prediccion_id = ? ORDER BY semana'),
+    puntosDeEjecucion: db.prepare(`
+      SELECT t.prediccion_id, t.semana, t.unidades
+        FROM predicciones_puntos t
+        JOIN predicciones_demanda p ON p.id = t.prediccion_id
+       WHERE p.ejecucion_id = ?
+       ORDER BY t.prediccion_id, t.semana
+    `),
+    // Repuestos activos que la ejecución no cubre: se crearon después, o cambió su tiempo de reposición.
+    pendientes: db.prepare(`
+      SELECT COUNT(*) AS total
+        FROM repuestos r
+        LEFT JOIN predicciones_demanda p ON p.repuesto_id = r.id AND p.ejecucion_id = ?
+       WHERE r.activo = 1 AND (p.id IS NULL OR p.dias_reposicion <> r.dias_reposicion)
+    `),
     antiguas: db.prepare('SELECT id FROM ejecuciones_prediccion ORDER BY id DESC LIMIT -1 OFFSET ?'),
     borrarPuntos: db.prepare('DELETE FROM predicciones_puntos WHERE prediccion_id IN (SELECT id FROM predicciones_demanda WHERE ejecucion_id = ?)'),
     borrarPredicciones: db.prepare('DELETE FROM predicciones_demanda WHERE ejecucion_id = ?'),
@@ -234,6 +248,20 @@ function crearRepositorioPrediccion(db) {
       const prediccion = aPrediccion(sentencias.deRepuesto.get({ ejecucionId, repuestoId }));
       if (!prediccion) return null;
       return { ...prediccion, pronostico: sentencias.puntos.all(prediccion.id).map((fila) => ({ ...fila })) };
+    },
+
+    /** @returns {Map<number, {semana: string, unidades: number}[]>} El pronóstico semanal de cada predicción de la ejecución. */
+    listarPuntos(ejecucionId) {
+      const porPrediccion = new Map();
+      sentencias.puntosDeEjecucion.all(ejecucionId).forEach(({ prediccion_id: id, semana, unidades }) => {
+        if (!porPrediccion.has(id)) porPrediccion.set(id, []);
+        porPrediccion.get(id).push({ semana, unidades });
+      });
+      return porPrediccion;
+    },
+    /** Cuántos repuestos activos necesitan que el modelo se ejecute de nuevo. */
+    contarPendientes(ejecucionId) {
+      return sentencias.pendientes.get(ejecucionId).total;
     },
 
     /** Conserva solo las ejecuciones más recientes: el detalle de las antiguas ya no se consulta. */
