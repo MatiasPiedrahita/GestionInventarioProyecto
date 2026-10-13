@@ -15,7 +15,8 @@ Hay cuatro familias:
 - **Demanda intermitente** (Croston, SBA, TSB): separan "cada cuánto sale"
   de "cuánto sale", que es como se comportan los repuestos de baja rotación.
 - **Estacional mensual**: perfil por mes del año sobre un suavizado, para
-  capturar temporadas (vacaciones, lluvias) cuando hay año y medio de historia.
+  capturar temporadas (vacaciones, lluvias). Se ajusta con un año de historia
+  y compite cuando hay dos (un año para aprender y otro para probarlo).
 """
 
 from __future__ import annotations
@@ -152,32 +153,78 @@ class HoltAmortiguado(Modelo):
         return _no_negativo(pronostico)
 
 
+def _recta_de_tendencia(valores: np.ndarray) -> np.ndarray:
+    """Valor de la recta de mínimos cuadrados en cada semana, sin bajar de un cuarto de la media.
+
+    El piso evita dividir entre casi cero (o entre un negativo) cuando la
+    recta de un repuesto que crece mucho corta el eje al principio.
+    """
+    tiempo = np.arange(len(valores), dtype=float)
+    pendiente, origen = np.polyfit(tiempo, valores, 1)
+    return np.maximum(origen + pendiente * tiempo, float(valores.mean()) * 0.25)
+
+
 class EstacionalMensual(Modelo):
     """Suavizado exponencial sobre la serie sin estación, más un perfil por mes del año.
 
-    El perfil de cada mes es cuánto se consume ese mes frente al promedio
-    (1,3 = un 30 % más). Necesita año y medio de historia, y solo calcula
-    el perfil de un mes cuando lo ha visto al menos dos veces (seis semanas):
-    con menos confundiría un mes raro con una temporada. Los índices se
-    encogen hacia 1 para no exagerar.
+    El perfil de un mes es cuánto se consume ese mes frente a lo normal
+    (1,3 = un 30 % más). Se calcula en tres pasos:
+
+    1. **Se quita la tendencia.** Cada semana se divide entre la recta que
+       mejor describe la serie. Sin esto, en un repuesto que crece, los
+       meses que más pesan al final de la historia parecerían temporada alta.
+    2. **Perfil crudo**: el promedio de esas razones en las semanas del mes.
+    3. **Se encoge hacia 1 según cuánta señal hay** (Bayes empírico). Si los
+       meses se diferencian mucho más de lo que explica el ruido de una
+       semana a otra, el perfil casi no se toca; si las diferencias caben en
+       el ruido, el perfil queda en 1 y el modelo se comporta como un
+       suavizado simple. Así no inventa temporadas donde no las hay ni
+       recorta las que sí existen.
+
+    Se ajusta con un año de historia (cada mes visto al menos cuatro
+    semanas). La evaluación le exige otro año para probarlo, de modo que
+    compite cuando el repuesto tiene dos años de consumo.
     """
 
     nombre = ESTACIONAL
-    semanas_minimas = 78
-    ENCOGIMIENTO = 0.7
+    semanas_minimas = 52
+    SEMANAS_POR_MES = 4
+    MESES_MINIMOS = 6
+
+    def _perfil(self, valores: np.ndarray, meses: np.ndarray) -> np.ndarray:
+        indices = np.ones(13)
+        if float(valores.mean()) <= 0:
+            return indices
+
+        razones = valores / _recta_de_tendencia(valores)
+        crudos: dict[int, float] = {}
+        semanas_del_mes: dict[int, int] = {}
+        suma_de_cuadrados, grados = 0.0, 0
+        for mes in range(1, 13):
+            del_mes = razones[meses == mes]
+            if len(del_mes) >= self.SEMANAS_POR_MES:
+                crudos[mes] = float(del_mes.mean())
+                semanas_del_mes[mes] = len(del_mes)
+                suma_de_cuadrados += float(np.square(del_mes - del_mes.mean()).sum())
+                grados += len(del_mes) - 1
+        if len(crudos) < self.MESES_MINIMOS or grados == 0:
+            return indices
+
+        # Ruido: cuánto se mueve el promedio de un mes solo por azar. Señal: lo que varían los meses más allá de ese ruido.
+        varianza_semanal = suma_de_cuadrados / grados
+        ruido = {mes: varianza_semanal / semanas_del_mes[mes] for mes in crudos}
+        senal = max(0.0, float(np.var(list(crudos.values()), ddof=1)) - float(np.mean(list(ruido.values()))))
+        centro = float(np.mean(list(crudos.values())))
+        for mes, crudo in crudos.items():
+            confianza = senal / (senal + ruido[mes]) if senal + ruido[mes] > 0 else 0.0
+            indices[mes] = 1.0 + confianza * (crudo / centro - 1.0)
+        # Normaliza para que el perfil no cambie el nivel medio del año.
+        indices[1:] = indices[1:] / indices[1:].mean()
+        return indices
 
     def ajustar(self, valores, semanas):
         meses = np.array([semana.month for semana in semanas])
-        media_global = float(valores.mean())
-        self._indices = np.ones(13)
-        if media_global > 0:
-            for mes in range(1, 13):
-                del_mes = valores[meses == mes]
-                if len(del_mes) >= 6:
-                    crudo = float(del_mes.mean()) / media_global
-                    self._indices[mes] = 1.0 + self.ENCOGIMIENTO * (crudo - 1.0)
-        # Normaliza para que el perfil no cambie el nivel medio del año.
-        self._indices[1:] = self._indices[1:] / self._indices[1:].mean()
+        self._indices = self._perfil(valores, meses)
         sin_estacion = valores / np.maximum(self._indices[meses], 0.05)
         self._base = SuavizadoExponencial().ajustar(sin_estacion, semanas)
         return self
