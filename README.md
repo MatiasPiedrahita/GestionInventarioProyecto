@@ -183,7 +183,7 @@ npm run test:cobertura   # con reporte de cobertura
 npm run test:python      # pruebas del modelo de predicción (pytest); antes: npm run prediccion:instalar -- --dev
 ```
 
-Resultado actual: **686 pruebas de la aplicación (Jest) en 51 suites y 184 del modelo (pytest), todas en verde.**
+Resultado actual: **723 pruebas de la aplicación (Jest) en 52 suites y 198 del modelo (pytest), todas en verde.**
 
 | Tipo | Carpeta | Qué verifican |
 |---|---|---|
@@ -314,7 +314,7 @@ Todas las rutas, salvo `/api/salud` y `/api/auth/login`, exigen la cabecera `Aut
 | GET | `/api/correos` | Dueño, admin | Bandeja de salida: los correos enviados o simulados |
 | POST | `/api/prediccion/ejecuciones` | Dueño, admin | Lanza el modelo: `{ horizonteSemanas?, nivelDeServicio? }`. Responde `202` y sigue calculando |
 | GET | `/api/prediccion/estado` | Dueño, admin | Si hay una ejecución en curso y cuál fue la última |
-| GET | `/api/prediccion/resumen` | Dueño, admin | La última predicción: un resultado por repuesto (modelo, demanda, punto de reorden, cantidad sugerida, fecha de quiebre) |
+| GET | `/api/prediccion/resumen` | Dueño, admin | La última predicción: un resultado por repuesto (modelo, demanda, punto de reorden, cantidad sugerida y fecha de quiebre con el stock de hoy) y `pendientes`, los repuestos que el cálculo todavía no cubre |
 | GET | `/api/prediccion/repuestos/:id` | Dueño, admin | Pronóstico semana a semana con su intervalo e historia de consumo, para el gráfico |
 | GET | `/api/prediccion/reportes` | Dueño, admin | Compras sugeridas por proveedor, clasificación ABC, repuestos sin movimiento y precisión del modelo |
 | GET | `/api/prediccion/reportes/compras.csv` | Dueño, admin | Las compras sugeridas como archivo para Excel |
@@ -351,9 +351,11 @@ Todos los errores tienen la misma forma:
 ### Predicción de demanda (HU-09)
 
 - **Qué hace:** con el consumo semanal de cada repuesto, el modelo pronostica las próximas semanas y calcula cuánto pedir, cuándo y en qué fecha se agotaría lo que hay. El detalle del modelo está en [`prediccion/README.md`](prediccion/README.md).
-- **Cómo se ejecuta:** el dueño o el administrador la lanzan cuando quieran, y una tarea programada la recalcula cada 24 horas. La aplicación extrae los datos, ejecuta el paquete de Python como un proceso aparte y guarda el resultado. Solo corre una ejecución a la vez.
-- **Integración con las alertas:** si un repuesto está por encima de su mínimo pero, al ritmo previsto, se agotaría antes de que alcance a llegar un pedido, se abre la alerta **"Se agotará pronto"** y se avisa al dueño. Además, cada alerta de stock muestra la cantidad que el modelo sugiere pedir.
+- **Cómo se ejecuta:** el dueño o el administrador la lanzan cuando quieran. Además, una tarea programada la recalcula cada 24 horas, o antes si cambia el catálogo (un repuesto nuevo, o uno al que le cambiaron el tiempo de reposición). La aplicación extrae los datos, ejecuta el paquete de Python como un proceso aparte y guarda el pronóstico. Solo corre una ejecución a la vez.
+- **Las recomendaciones siguen al stock:** el pronóstico se calcula al ejecutar el modelo, pero cuánto pedir, para cuántos días alcanza y cuándo se agota se recalculan con el stock de hoy cada vez que se consultan. Registrar una compra o gastar repuestos en una orden cambia la recomendación al instante, sin volver a ejecutar el modelo (ADR-22).
+- **Integración con las alertas:** si un repuesto está por encima de su mínimo pero, al ritmo previsto, se agotaría antes de que alcance a llegar un pedido, se abre la alerta **"Se agotará pronto"** y se avisa al dueño. Se revisa con cada cambio de stock y se cierra sola cuando llega la mercancía. Además, cada alerta de stock muestra la cantidad que se sugiere pedir.
 - **Días de reposición:** cada repuesto guarda cuántos días tarda en llegar su pedido (7 por defecto). Se edita en el inventario.
+- **Qué cambian los controles:** las semanas del pronóstico deciden hasta dónde llega el gráfico de cada repuesto; el nivel de servicio, cuánto colchón de seguridad se guarda. Las compras sugeridas siempre cubren el tiempo de reposición más 30 días.
 - **Vista "Predicción":** cinco reportes sobre el mismo cálculo. *Compras sugeridas* (qué pedir hoy, por proveedor, exportable a CSV), *Todos los repuestos* (con el gráfico de historia y pronóstico de cada uno), *Clasificación ABC*, *Sin movimiento* (plata quieta) y *Precisión del modelo* (cuánto error ahorra frente a repetir la última semana).
 - **Sin Python instalado** la aplicación funciona igual; la predicción queda como fallida con un mensaje que dice cómo instalarlo (`npm run prediccion:instalar`).
 
@@ -377,9 +379,9 @@ Todos los errores tienen la misma forma:
 ### Limitaciones conocidas
 
 - **Un solo escritor.** SQLite admite una escritura a la vez. Para un taller es suficiente; pasar a PostgreSQL implicaría reescribir los repositorios (`*.repository.js`), no los servicios ni las rutas.
-- **Fechas en UTC.** Los reportes por semana y por mes agrupan con la hora universal: una orden cerrada un domingo después de las 7 p. m. (hora de Colombia) cuenta en la semana siguiente.
+- **Fechas en UTC.** Los reportes por semana y por mes agrupan con la hora universal: una orden cerrada un domingo después de las 7 p. m. (hora de Colombia) cuenta en la semana siguiente. Por lo mismo, después de esa hora las fechas de agotamiento de la predicción se cuentan desde el día siguiente.
 - **El correo es simulado** mientras no se configure un servidor SMTP en el `.env`.
-- **El modelo de predicción** no usa variables externas (festivos, precios), modela cada repuesto por separado y necesita al menos 12 semanas de historia para poder medirse. Sus límites están en [`prediccion/README.md`](prediccion/README.md).
+- **El modelo de predicción** no usa variables externas (festivos, precios), modela cada repuesto por separado, necesita al menos 12 semanas de historia para poder medirse y dos años para reconocer temporadas. Sus límites están en [`prediccion/README.md`](prediccion/README.md).
 - **Las pruebas de interfaz** usan un navegador simulado (jsdom): verifican el comportamiento, no el aspecto visual.
 - **Sin HTTPS propio.** Fuera de la red local, la aplicación debe ir detrás de un servidor que cifre el tráfico.
 
@@ -429,7 +431,8 @@ El pipeline de CI, las pruebas automatizadas y la revisión de los pull requests
 - Construir las alertas de stock bajo con notificaciones en la aplicación y por correo.
 - Diseñar y programar el modelo de predicción en Python (`prediccion/`) y sus pruebas. El equipo pidió un modelo de series de tiempo sobre el historial de consumo, hecho en Python; la elección de los modelos (suavizado exponencial, Holt, estacional, Croston, SBA, TSB), de la métrica (RMSSE) y de la política de inventario la propuso la IA y está justificada en el ADR-19.
 - Integrar el modelo con la aplicación (ejecución, almacenamiento, alertas) y construir la vista de predicción con sus reportes y gráficos.
-- Proponer las decisiones de diseño registradas en los ADR-12 a ADR-21.
+- Proponer las decisiones de diseño registradas en los ADR-12 a ADR-22.
+- Diagnosticar por qué las recomendaciones de la predicción no reflejaban el stock (recorriendo la aplicación con una copia de los datos), corregirlo y medir el modelo contra historias simuladas de demanda conocida (ADR-22).
 - Desde la HU-07: crear las ramas, los commits y los pull requests desde la cuenta de un integrante, y fusionarlos cuando el pipeline quedó en verde.
 - Escribir las pruebas automatizadas, incluida la traducción de cada prueba de funcionalidad del plan de sprints a escenarios Dado/Cuando/Entonces.
 - Configurar el workflow de GitHub Actions y el análisis de vulnerabilidades.
