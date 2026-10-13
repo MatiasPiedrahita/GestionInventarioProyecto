@@ -227,8 +227,26 @@ window.Taller.vistas.prediccion = (function crearVistaPrediccion() {
   function resumirEjecucion(ejecucion) {
     const motor = ejecucion.motor ? `${ejecucion.motor.nombre} ${ejecucion.motor.version}` : 'modelo';
     const quien = ejecucion.origen === 'PROGRAMADA' ? 'automáticamente' : `por ${ejecucion.iniciadaPor || 'un usuario'}`;
-    return `Calculada el ${formato.fechaSqlite(ejecucion.finalizadaEn)} ${quien}, con ${motor}. `
+    return `Pronóstico calculado el ${formato.fechaSqlite(ejecucion.finalizadaEn)} ${quien}, con ${motor}. `
       + `Proyecta ${ejecucion.horizonteSemanas} semanas con un nivel de servicio del ${formato.porcentaje(ejecucion.nivelDeServicio)}.`;
+  }
+
+  /** Deja los selectores en los valores del cálculo que se está viendo, para que no parezca que se usaron otros. */
+  function mostrarParametros(ejecucion) {
+    [['#prediccion-horizonte', ejecucion.horizonteSemanas], ['#prediccion-servicio', ejecucion.nivelDeServicio]].forEach(([selector, valor]) => {
+      const lista = $(selector);
+      if ([...lista.options].some((opcion) => opcion.value === String(valor))) lista.value = String(valor);
+    });
+  }
+
+  /** Repuestos que el cálculo vigente no cubre: se crearon después, o les cambiaron el tiempo de reposición. */
+  function avisarPendientes(pendientes) {
+    const nota = $('#pendientes-prediccion');
+    nota.hidden = pendientes === 0;
+    nota.textContent = pendientes === 0 ? '' : `${pendientes === 1
+      ? 'Hay 1 repuesto nuevo o con otro tiempo de reposición que este cálculo no incluye.'
+      : `Hay ${pendientes} repuestos nuevos o con otro tiempo de reposición que este cálculo no incluye.`} `
+      + 'Se recalcula solo en unos minutos; para verlo ya, presione "Calcular predicción".';
   }
 
   function mostrarCalculando(calculando) {
@@ -246,6 +264,8 @@ window.Taller.vistas.prediccion = (function crearVistaPrediccion() {
 
     if (hay) {
       $('#resumen-prediccion').textContent = resumirEjecucion(resumen.ejecucion);
+      mostrarParametros(resumen.ejecucion);
+      avisarPendientes(resumen.pendientes || 0);
       const reportes = await api.pedir('/api/prediccion/reportes');
       pintarIndicadores(reportes);
       pintarCompras(reportes.compras);
@@ -359,7 +379,7 @@ window.Taller.vistas.prediccion = (function crearVistaPrediccion() {
       ? 'Todavía no se pudo medir'
       : `${formato.porcentaje(Math.max(p.metricas.mejoraSobreIngenuo, 0))} menos de error que repetir la última semana`);
     dato(ficha, `Demanda en ${p.pronostico.length} semanas`, `${formato.unidades(p.demandaTotal)} unidades`, `${formato.unidades(p.demandaDiaria * 7)} por semana`);
-    dato(ficha, 'Stock actual', plural(p.repuesto.stockActual, 'unidad', 'unidades'), `Alcanza para: ${cobertura(p).toLowerCase()}`);
+    dato(ficha, 'Stock de hoy', plural(p.repuesto.stockActual, 'unidad', 'unidades'), `Alcanza para: ${cobertura(p).toLowerCase()}`);
     dato(ficha, 'Punto de reorden', plural(p.puntoDeReorden, 'unidad', 'unidades'), `Incluye ${p.stockDeSeguridad} de colchón. El pedido tarda ${plural(p.repuesto.diasReposicion, 'día', 'días')}`);
     dato(ficha, 'Recomendación', p.debePedir ? `Pedir ${p.cantidadSugerida}` : 'No hace falta pedir', p.quiebreAntesDeReponer ? 'Se agotaría antes de que llegue el pedido' : null);
     dato(ficha, 'Último trimestre', NOMBRE_TENDENCIA[p.tendencia] || p.tendencia,
