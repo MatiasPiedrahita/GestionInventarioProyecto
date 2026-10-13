@@ -2,6 +2,7 @@ const { crearContexto } = require('../helpers/contexto');
 const { describirConPython } = require('../helpers/motor-simulado');
 const { repuestoConHistoria } = require('../helpers/historia');
 const { crearMotorPython } = require('../../src/modules/prediccion/motor-python');
+const { aplicarPolitica } = require('../../src/modules/prediccion/politica');
 
 /**
  * PRUEBA DE CONTRATO entre la aplicación (Node.js) y el modelo (Python).
@@ -111,6 +112,75 @@ describirConPython('Contrato Node ↔ Python: la aplicación ejecuta el modelo r
     expect(p.aviso).toContain('todavía');
     expect(p.modeloNombre).toBe('Sin modelo');
     expect((await prediccionDe(estable)).patronDescripcion).toBe('Se usa casi todas las semanas y en cantidades parecidas');
+  });
+
+  /**
+   * La aplicación repite la política de inventario del modelo cada vez que
+   * muestra una recomendación, con el stock del momento (politica.js). Con
+   * el stock y la fecha del cálculo, las dos versiones tienen que coincidir.
+   */
+  describe('la política de la aplicación da lo mismo que la del modelo', () => {
+    jest.setTimeout(120000);
+
+    /** Catálogo variado y siempre igual: demanda alta, media y esporádica, con distintos stocks y plazos. */
+    function catalogo(corte) {
+      let semilla = 20261012;
+      const azar = () => {
+        semilla = (semilla * 1103515245 + 12345) % 2147483648;
+        return semilla / 2147483648;
+      };
+      const lunes = new Date(`${corte}T00:00:00Z`);
+      lunes.setUTCDate(lunes.getUTCDate() - ((lunes.getUTCDay() + 6) % 7));
+      const semana = (haceSemanas) => new Date(lunes.getTime() - haceSemanas * 7 * 86400000).toISOString().slice(0, 10);
+
+      return Array.from({ length: 18 }, (_, i) => {
+        const nivel = [9, 3, 0.4][i % 3];
+        const semanas = 20 + Math.floor(azar() * 50);
+        const consumo = [];
+        for (let hace = semanas; hace >= 1; hace -= 1) {
+          const hay = nivel >= 1 || azar() < nivel;
+          if (hay) consumo.push({ semana: semana(hace), unidades: Math.max(1, Math.round(nivel * (0.4 + azar() * 1.2))) });
+        }
+        return {
+          id: i + 1, sku: `CON-${i + 1}`, costo: 1000 * (i + 1), stockMinimo: 2, stockActual: Math.floor(azar() * 40),
+          diasDeReposicion: 1 + Math.floor(azar() * 30), primeraSemana: semana(semanas), consumo,
+        };
+      });
+    }
+
+    test.each([['lunes', '2026-10-12'], ['jueves', '2026-10-15'], ['domingo', '2026-10-18']])(
+      'calculando un %s, cada decisión del modelo se reproduce con su pronóstico publicado',
+      async (_, corte) => {
+        const repuestos = catalogo(corte);
+        const salida = await crearMotorPython().predecir({ version: 1, fechaDeCorte: corte, horizonteSemanas: 8, nivelDeServicio: 0.95, repuestos });
+
+        expect(salida.repuestos).toHaveLength(18);
+        salida.repuestos.forEach((r, i) => {
+          const deLaAplicacion = aplicarPolitica({
+            pronostico: r.pronostico.map((punto) => punto.unidades),
+            primeraSemana: r.pronostico[0].semana,
+            hoy: corte,
+            stockActual: repuestos[i].stockActual,
+            diasDeReposicion: repuestos[i].diasDeReposicion,
+            stockDeSeguridad: r.stockDeSeguridad,
+          });
+          const delModelo = {
+            demandaEnReposicion: r.demandaEnReposicion,
+            puntoDeReorden: r.puntoDeReorden,
+            cantidadSugerida: r.cantidadSugerida,
+            debePedir: r.debePedir,
+            diasDeCobertura: r.diasDeCobertura,
+            fechaDeQuiebre: r.fechaDeQuiebre,
+            quiebreAntesDeReponer: r.quiebreAntesDeReponer,
+          };
+
+          expect({ sku: r.sku, ...deLaAplicacion }).toEqual({ sku: r.sku, ...delModelo });
+          if (r.debePedir) expect(r.cantidadSugerida).toBeGreaterThanOrEqual(1);
+        });
+        // El catálogo de prueba ejercita los dos caminos: repuestos por pedir y repuestos con stock de sobra.
+        expect(new Set(salida.repuestos.map((r) => r.debePedir)).size).toBe(2);
+      },
+    );
   });
 
   describe('el motor por separado', () => {

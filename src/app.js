@@ -68,7 +68,7 @@ const cabecerasDeSeguridad = helmet({
  * las pruebas usen una base en memoria, aislada y desechable.
  *
  * @param {{ db?: import('node:sqlite').DatabaseSync, ahora?: () => Date, transporteDeCorreo?: object, urlDeLaAplicacion?: string,
- *           motorDePrediccion?: { predecir: Function, descripcion: string } }} opciones
+ *           motorDePrediccion?: { predecir: Function, descripcion: string }, horasEntrePredicciones?: number }} opciones
  */
 function crearApp({
   db = crearConexion(':memory:'),
@@ -76,6 +76,7 @@ function crearApp({
   transporteDeCorreo = crearTransporteDeCorreo(),
   urlDeLaAplicacion = process.env.APP_URL || null,
   motorDePrediccion = crearMotorPython(),
+  horasEntrePredicciones = Math.max(1, Number(process.env.PREDICCION_INTERVALO_HORAS) || 24),
 } = {}) {
   const app = express();
 
@@ -103,6 +104,7 @@ function crearApp({
     alertas: servicioAlertas,
     auditoria: servicioAuditoria,
     ahora,
+    horasDeVigencia: horasEntrePredicciones,
   });
 
   // Conexión entre módulos: inventario y órdenes avisan; alertas y notificaciones reaccionan.

@@ -794,6 +794,9 @@ td .estado + .detalle, td .estado { margin-right: 0.4rem; }
 .insignia-abc--b { background: var(--tinta-suave); }
 .insignia-abc--c { background: #fff; color: var(--tinta); border: 2px solid var(--tinta-suave); }
 
+.explicacion { margin: 0 0 1rem; max-width: 110ch; font-size: 0.9rem; color: var(--tinta-suave); }
+.explicacion strong { color: var(--tinta); font-weight: 600; }
+#pendientes-prediccion { margin: 0 0 1rem; }
 .nota-de-aviso { color: var(--oxido); }
 p.nota-de-aviso { background: var(--oxido-claro); border-left: 4px solid var(--oxido); padding: 0.6rem 0.9rem; border-radius: 0 var(--radio-control) var(--radio-control) 0; margin-top: 1rem; }
 .dialogo-orden--ancho { width: min(920px, 96vw); }

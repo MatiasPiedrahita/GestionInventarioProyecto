@@ -116,7 +116,7 @@
         </div>
         <form class="controles-prediccion" id="formulario-prediccion">
           <div class="campo">
-            <label for="prediccion-horizonte">Proyectar</label>
+            <label for="prediccion-horizonte">Semanas del pronóstico</label>
             <select id="prediccion-horizonte" name="horizonteSemanas">
               <option value="4">4 semanas</option>
               <option value="8" selected>8 semanas</option>
@@ -146,6 +146,12 @@
         </section>
 
         <div id="contenido-prediccion" hidden>
+          <p class="nota-de-aviso" id="pendientes-prediccion" role="status" hidden></p>
+          <p class="explicacion">
+            <strong>Qué pedir y hasta cuándo alcanza se calculan con el stock de hoy:</strong> cambian con cada orden y cada entrada de mercancía, sin recalcular.
+            El pronóstico de consumo sí se calcula con el botón (y solo, una vez al día). Las semanas del pronóstico deciden hasta dónde llega
+            el gráfico de cada repuesto; el nivel de servicio, cuánto colchón de seguridad se guarda.
+          </p>
           <div class="indicadores" id="indicadores-prediccion"></div>
 
           <div class="pestanas" id="pestanas-prediccion" role="tablist" aria-label="Reportes de la predicción">

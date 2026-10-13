@@ -88,7 +88,46 @@ describirConPython('HU-09 · Criterio de aceptación: el modelo proyecta la dema
     expect((await ctx.como('dueno').get('/api/alertas')).body.datos).toEqual([]);
   }, 120000);
 
-  test('Escenario 4 — Dado un mecánico, Cuando intenta ejecutar o consultar la predicción, Entonces la API responde 403: es una función del administrador y del dueño', async () => {
+  test('Escenario 4 — Dado un pronóstico ya calculado que recomienda comprar, Cuando llega la mercancía y más adelante se gasta en órdenes, Entonces la recomendación y la alerta cambian con el stock, sin volver a ejecutar el modelo', async () => {
+    // Dado: consume 7 por semana y quedan 5; el modelo recomienda comprar y avisa que se va a agotar.
+    const ctx = crearContexto();
+    const admin = ctx.como('administrador');
+    const dueno = ctx.como('dueno');
+    const filtro = await repuestoConHistoria(ctx, { unidadesPorSemana: Array(26).fill(7), stockFinal: 5, stockMinimo: 2, diasReposicion: 14 });
+    await ejecutarPrediccion(ctx, admin);
+    const recomendacion = async () => (await admin.get(`/api/prediccion/repuestos/${filtro.id}`)).body;
+    const alertas = async () => (await dueno.get('/api/alertas')).body.datos.map((a) => a.tipo);
+    const alCalcular = await recomendacion();
+    expect(alCalcular.debePedir).toBe(true);
+    expect(await alertas()).toEqual(['QUIEBRE_PROYECTADO']);
+
+    // Cuando: llega el pedido.
+    await dueno.post(`/api/repuestos/${filtro.id}/entradas`).send({ cantidad: 60 });
+    const conMercancia = await recomendacion();
+    const alertasConMercancia = await alertas();
+    // Y cuando, más adelante, una orden grande se lleva casi todo.
+    const mecanico = ctx.como('mecanico');
+    const { body: orden } = await mecanico.post('/api/ordenes').send({
+      cliente: { documento: '1037000111', nombre: 'Flota de taxis', telefono: '3000000000' },
+      vehiculo: { placa: 'TAX123', marca: 'Hyundai', modelo: 'Atos' },
+      descripcion: 'Cambio de filtros de toda la flota',
+    });
+    await mecanico.post(`/api/ordenes/${orden.id}/repuestos`).send({ items: [{ repuestoId: filtro.id, cantidad: 57 }] });
+    const trasLaOrden = await recomendacion();
+
+    // Entonces
+    expect(conMercancia).toMatchObject({ repuesto: { stockActual: 65 }, debePedir: false, cantidadSugerida: 0, quiebreAntesDeReponer: false });
+    expect(conMercancia.diasDeCobertura).toBeGreaterThan(55);
+    expect(alertasConMercancia).toEqual([]);
+    expect(trasLaOrden).toMatchObject({ repuesto: { stockActual: 8 }, debePedir: true, quiebreAntesDeReponer: true });
+    expect(trasLaOrden.cantidadSugerida).toBeGreaterThan(30);
+    expect(await alertas()).toEqual(['QUIEBRE_PROYECTADO']);
+    // El pronóstico es el mismo de antes: el modelo se ejecutó una sola vez.
+    expect(trasLaOrden.pronostico).toEqual(alCalcular.pronostico);
+    expect((await admin.get('/api/prediccion/ejecuciones')).body).toHaveLength(1);
+  }, 120000);
+
+  test('Escenario 5 — Dado un mecánico, Cuando intenta ejecutar o consultar la predicción, Entonces la API responde 403: es una función del administrador y del dueño', async () => {
     // Dado
     const ctx = crearContexto();
     const mecanico = ctx.como('mecanico');

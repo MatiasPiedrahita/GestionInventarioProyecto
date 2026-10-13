@@ -57,7 +57,7 @@ class TestOrigenMovil:
         assert set(pruebas.values()) == {52}
 
     def test_un_modelo_que_no_puede_ajustarse_en_el_primer_origen_no_compite(self):
-        # Con 100 semanas el primer origen ajusta con 48: al modelo estacional (78) no le alcanza.
+        # Con 100 semanas el primer origen ajusta con 48: al modelo estacional (52) no le alcanza.
         valores = serie_estacional(100)
 
         assert evaluar_serie(modelos.ESTACIONAL, valores).rmsse is None
@@ -148,6 +148,13 @@ class TestElegirModelo:
         assert mejor.modelo == modelos.ESTACIONAL
         assert mejor.rmsse < 1
 
+    def test_con_dos_anios_de_historia_el_modelo_estacional_ya_compite_y_gana(self):
+        # Un año para aprender las temporadas y otro para probarlas.
+        mejor, evaluaciones = elegir_para(serie_estacional(104))
+
+        assert mejor.modelo == modelos.ESTACIONAL
+        assert {e.semanas_de_prueba for e in evaluaciones} == {52}
+
     def test_en_un_empate_gana_el_modelo_mas_simple(self):
         mejor, evaluaciones = elegir_para(serie_constante())
 
@@ -191,9 +198,9 @@ class TestElegirModelo:
 class TestPoliticaDeInventario:
     SIETE_POR_SEMANA = np.full(8, 7.0)  # una unidad diaria
 
-    def politica(self, pronostico=None, error=2.0, stock=10, reposicion=7, servicio=0.95):
+    def politica(self, pronostico=None, error=2.0, stock=10, reposicion=7, servicio=0.95, corte=CORTE):
         pronostico = self.SIETE_POR_SEMANA if pronostico is None else pronostico
-        return inventario.politica(pronostico, error, stock, reposicion, servicio, CORTE)
+        return inventario.politica(pronostico, error, stock, reposicion, servicio, corte)
 
     @pytest.mark.parametrize("servicio, z", [(0.5, 0.0), (0.90, 1.2816), (0.95, 1.6449), (0.99, 2.3263)])
     def test_z_de_servicio(self, servicio, z):
@@ -212,6 +219,19 @@ class TestPoliticaDeInventario:
     )
     def test_demanda_en_dias_reparte_cada_semana_en_siete_dias(self, pronostico, dias, esperado):
         assert inventario.demanda_en_dias(np.array(pronostico, dtype=float), dias) == pytest.approx(esperado)
+
+    @pytest.mark.parametrize(
+        "dias, desfase, esperado",
+        [
+            (7, 3, 4 * 1 + 3 * 2),  # jueves: cuatro días de la primera semana (1 al día) y tres de la segunda (2 al día)
+            (4, 3, 4.0),  # de jueves a domingo: todo sale de la primera semana
+            (5, 6, 1 * 1 + 4 * 2),  # domingo: un día de la primera semana y cuatro de la segunda
+            (7, 7, 14.0),  # el desfase ya consumió la primera semana entera
+            (7, 21, 14.0),  # más allá del horizonte se prolonga la última semana
+        ],
+    )
+    def test_demanda_en_dias_respeta_el_dia_de_la_semana_en_que_se_calcula(self, dias, desfase, esperado):
+        assert inventario.demanda_en_dias(np.array([7.0, 14.0]), dias, desfase) == pytest.approx(esperado)
 
     def test_ejemplo_completo_calculado_a_mano(self):
         # Una unidad diaria, error semanal 2, reposición en 7 días, servicio 95 %, stock 10.
@@ -276,14 +296,38 @@ class TestPoliticaDeInventario:
 
         assert dias == 9.0
 
+    def test_un_jueves_la_semana_en_curso_solo_aporta_los_dias_que_le_quedan(self):
+        # Semana 1: 7 unidades (1 al día). Semana 2: 14 (2 al día). Con 11 en stock, un jueves:
+        # de jueves a domingo se gastan 4; los 7 restantes duran 3,5 días de la semana siguiente.
+        assert inventario.dias_hasta_el_quiebre(np.array([7.0, 14.0]), 11, desfase=3) == 7.5
+
+        jueves = date(2026, 10, 15)
+        resultado = self.politica(pronostico=np.array([7.0, 14.0, 14.0, 14.0]), stock=11, corte=jueves)
+
+        assert resultado["demandaEnReposicion"] == 10.0  # 4 días a 1 + 3 días a 2
+        assert resultado["diasDeCobertura"] == 7.5
+        assert resultado["fechaDeQuiebre"] == "2026-10-22"  # jueves 15 + 7 días
+
+    def test_si_hay_que_pedir_nunca_sugiere_cero_unidades(self):
+        # Una batería: sale una cada seis semanas. Reorden = techo(0,16 + 1) = 2 y objetivo = techo(0,85 + 1) = 2.
+        # Con 2 en stock hay que pedir, y lo que faltaba para el objetivo era cero.
+        resultado = self.politica(pronostico=np.full(8, 0.16), error=0.4, stock=2)
+
+        assert resultado["puntoDeReorden"] == 2
+        assert resultado["debePedir"] is True
+        assert resultado["cantidadSugerida"] == 1  # lo justo para quedar por encima del punto de reorden
+
     def test_las_cantidades_son_enteros_no_negativos(self, generador):
-        for _ in range(50):
+        for _ in range(200):
             resultado = self.politica(
-                pronostico=generador.uniform(0, 12, 8), error=generador.uniform(0, 6),
+                pronostico=generador.uniform(0, 12, 8) * generador.choice([0.02, 0.2, 1.0]), error=generador.uniform(0, 6),
                 stock=int(generador.integers(0, 80)), reposicion=int(generador.integers(1, 45)),
+                corte=date(2026, 10, 12 + int(generador.integers(0, 7))),
             )
             for campo in ("stockDeSeguridad", "puntoDeReorden", "cantidadSugerida"):
                 assert isinstance(resultado[campo], int) and resultado[campo] >= 0
+            if resultado["debePedir"]:
+                assert resultado["cantidadSugerida"] >= 1
 
 
 class TestClasificacionAbc:

@@ -15,10 +15,11 @@ const MINUTOS_ENTRE_REVISIONES = Math.max(1, Number(process.env.ALERTAS_INTERVAL
 const programador = crearProgramador();
 programador.programar('Revisión de stock bajo', MINUTOS_ENTRE_REVISIONES, () => servicios.alertas.revisar(), { alIniciar: true });
 
-// Tarea programada: recalcula la predicción de demanda cuando la vigente tiene más de un día.
-// Al arrancar, solo se ejecuta si de verdad hace falta (y si Python está disponible).
-const HORAS_ENTRE_PREDICCIONES = Math.max(1, Number(process.env.PREDICCION_INTERVALO_HORAS) || 24);
-programador.programar('Predicción de demanda', HORAS_ENTRE_PREDICCIONES * 60, () => servicios.prediccion.ejecutarSiHaceFalta(), { alIniciar: true });
+// Tarea programada: cada pocos minutos pregunta si hay que recalcular la predicción de demanda.
+// Solo ejecuta el modelo si la vigente ya venció (PREDICCION_INTERVALO_HORAS) o si el catálogo
+// cambió (un repuesto nuevo, otro tiempo de reposición), y si Python está disponible.
+const MINUTOS_ENTRE_COMPROBACIONES = 10;
+programador.programar('Predicción de demanda', MINUTOS_ENTRE_COMPROBACIONES, () => servicios.prediccion.ejecutarSiHaceFalta(), { alIniciar: true });
 servicios.sistema.registrarSeccion('tareas', () => programador.estado());
 
 const servidor = app.listen(PUERTO, () => {

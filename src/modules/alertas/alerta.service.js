@@ -24,10 +24,17 @@ function leerNota(entrada, campo) {
  * Revisar es idempotente: un repuesto nunca tiene dos alertas abiertas del
  * mismo tipo ni recibe dos veces el mismo aviso.
  *
+ * La misma revisión mantiene las alertas de "se agotará pronto" (quiebre
+ * proyectado), que salen de la predicción de demanda: el repuesto está por
+ * encima de su mínimo, pero al ritmo previsto no alcanza hasta que llegue
+ * un pedido. Como dependen del stock, se abren y se cierran con cada cambio
+ * de stock, igual que las demás.
+ *
  * @param {object} repositorio Repositorio de alertas.
  * @param {{ notificaciones: object, destinatarios: () => object[], auditoria?: object, urlDeLaAplicacion?: string,
  *           sugerencias?: () => Map<number, object> }} dependencias
- *        sugerencias devuelve, por repuesto, lo que recomienda la última predicción de demanda (cuánto pedir, cuándo se agota).
+ *        sugerencias devuelve, por repuesto, lo que recomienda hoy la última predicción de demanda (cuánto pedir, cuándo se agota
+ *        y, en quiebreProyectado, la explicación si se agotaría antes de que llegue un pedido).
  */
 function crearServicioAlertas(repositorio, {
   notificaciones,
@@ -47,8 +54,8 @@ function crearServicioAlertas(repositorio, {
     );
   }
 
-  /** Aplica las reglas a un repuesto. Devuelve los ids de las alertas de las que hay que avisar. */
-  function procesar(repuesto, resultado) {
+  /** Aplica las reglas a un repuesto y anota en `resultado` las alertas creadas, escaladas y resueltas. */
+  function procesar(repuesto, resultado, recomendado) {
     const abiertas = repositorio.listarAbiertasDe(repuesto.id);
     const deNivel = abiertas.find((a) => TIPOS_DE_NIVEL.includes(a.tipo)) || null;
     const { accion, tipo } = decidir(repuesto, deNivel);
@@ -68,15 +75,32 @@ function crearServicioAlertas(repositorio, {
       resultado.resueltas.push(deNivel.id);
     }
 
-    abiertas.filter((a) => !TIPOS_DE_NIVEL.includes(a.tipo)).forEach((alerta) => {
-      const llegoMercancia = alerta.tipo === TIPOS.FALTANTE_REPORTADO && repuesto.stockActual > alerta.stockAlGenerar;
-      // Si el stock ya llegó al mínimo, la alerta real reemplaza a la proyección.
-      const yaEsReal = alerta.tipo === TIPOS.QUIEBRE_PROYECTADO && nivelDeStock(repuesto) !== null;
-      if (!repuesto.activo || llegoMercancia || yaEsReal) {
+    abiertas.filter((a) => a.tipo === TIPOS.FALTANTE_REPORTADO).forEach((alerta) => {
+      if (!repuesto.activo || repuesto.stockActual > alerta.stockAlGenerar) {
         repositorio.resolver(alerta.id);
         resultado.resueltas.push(alerta.id);
       }
     });
+
+    // Quiebre proyectado: solo aplica mientras el stock esté por encima del mínimo.
+    // Si ya llegó al mínimo, manda la alerta real y la proyección sobra.
+    const proyectada = abiertas.find((a) => a.tipo === TIPOS.QUIEBRE_PROYECTADO) || null;
+    const sugerencia = recomendado.get(repuesto.id);
+    const explicacion = repuesto.activo && nivelDeStock(repuesto) === null && sugerencia ? sugerencia.quiebreProyectado : null;
+    if (explicacion && !proyectada) {
+      resultado.creadas.push(repositorio.insertar({
+        repuestoId: repuesto.id,
+        tipo: TIPOS.QUIEBRE_PROYECTADO,
+        stockAlGenerar: repuesto.stockActual,
+        stockMinimo: repuesto.stockMinimo,
+        detalle: explicacion,
+      }));
+    } else if (explicacion && proyectada.detalle !== explicacion) {
+      repositorio.cambiarDetalle(proyectada.id, explicacion);
+    } else if (!explicacion && proyectada) {
+      repositorio.resolver(proyectada.id);
+      resultado.resueltas.push(proyectada.id);
+    }
   }
 
   return {
@@ -91,7 +115,8 @@ function crearServicioAlertas(repositorio, {
         ? repositorio.listarRepuestos()
         : [...new Set(ids)].map((id) => repositorio.buscarRepuesto(id)).filter(Boolean);
 
-      repositorio.enTransaccion(() => repuestos.forEach((repuesto) => procesar(repuesto, resultado)));
+      const recomendado = sugerencias();
+      repositorio.enTransaccion(() => repuestos.forEach((repuesto) => procesar(repuesto, resultado, recomendado)));
       avisar([...resultado.creadas, ...resultado.escaladas]);
 
       return {
@@ -114,48 +139,6 @@ function crearServicioAlertas(repositorio, {
         if (process.env.NODE_ENV !== 'test') console.error('No se pudieron actualizar las alertas de stock:', error);
         else throw error;
       }
-    },
-
-    /**
-     * Integración con la predicción de demanda. Recibe los repuestos que,
-     * según el modelo, se agotarían antes de que alcance a llegar un pedido,
-     * aunque hoy estén por encima de su mínimo. Abre esas alertas, actualiza
-     * las que ya existían y resuelve las que el modelo ya no proyecta.
-     *
-     * @param {{ repuestoId: number, detalle: string }[]} proyectados
-     */
-    sincronizarProyectadas(proyectados) {
-      const porRepuesto = new Map(proyectados.map((p) => [p.repuestoId, p]));
-      const nuevas = [];
-      let resueltas = 0;
-
-      repositorio.enTransaccion(() => {
-        repositorio.listarRepuestos().forEach((repuesto) => {
-          const abiertas = repositorio.listarAbiertasDe(repuesto.id);
-          const proyectada = abiertas.find((a) => a.tipo === TIPOS.QUIEBRE_PROYECTADO);
-          // Si el stock ya está en el mínimo, manda la alerta real: la proyección sobra.
-          const yaEsReal = abiertas.some((a) => TIPOS_DE_NIVEL.includes(a.tipo));
-          const pedida = repuesto.activo && !yaEsReal ? porRepuesto.get(repuesto.id) : null;
-
-          if (pedida && !proyectada) {
-            nuevas.push(repositorio.insertar({
-              repuestoId: repuesto.id,
-              tipo: TIPOS.QUIEBRE_PROYECTADO,
-              stockAlGenerar: repuesto.stockActual,
-              stockMinimo: repuesto.stockMinimo,
-              detalle: pedida.detalle,
-            }));
-          } else if (pedida && proyectada) {
-            repositorio.cambiarDetalle(proyectada.id, pedida.detalle);
-          } else if (!pedida && proyectada) {
-            repositorio.resolver(proyectada.id);
-            resueltas += 1;
-          }
-        });
-      });
-
-      avisar(nuevas);
-      return { creadas: nuevas.length, resueltas };
     },
 
     /** El mecánico avisa que un repuesto falta o no alcanza para un trabajo, aunque el sistema diga que hay. */

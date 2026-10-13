@@ -1,14 +1,18 @@
 const { spawnSync } = require('node:child_process');
 const { resolverPython, CARPETA_DEL_MODELO } = require('../../src/modules/prediccion/interprete');
+const { aplicarPolitica } = require('../../src/modules/prediccion/politica');
 
 /**
  * Motor de predicción simulado para las pruebas de la aplicación.
  *
  * Respeta el contrato del modelo real (prediccion/README.md) con una regla
  * simple y predecible: el pronóstico de cada semana es el promedio de las
- * semanas con consumo. Así las pruebas de Node verifican qué se le envía al
- * modelo y qué se hace con su respuesta, sin depender de Python. El modelo
- * de verdad tiene sus propias pruebas (pytest) y una prueba de contrato.
+ * semanas con consumo, y el colchón de seguridad es de una unidad. Las
+ * decisiones (cuánto pedir, cuándo se agota) salen de la misma política que
+ * usa la aplicación, igual que en el modelo real. Así las pruebas de Node
+ * verifican qué se le envía al modelo y qué se hace con su respuesta, sin
+ * depender de Python. El modelo de verdad tiene sus propias pruebas (pytest)
+ * y una prueba de contrato.
  *
  * @param {{ ajustar?: (prediccion: object, repuesto: object) => object, falla?: Error }} opciones
  *        ajustar permite cambiar el resultado de un repuesto en una prueba concreta.
@@ -22,10 +26,21 @@ function crearMotorSimulado({ ajustar = (prediccion) => prediccion, falla = null
       ? repuesto.consumo.reduce((suma, c) => suma + c.unidades, 0) / repuesto.consumo.length
       : 0;
     const diaria = media / 7;
-    const dias = diaria > 0 ? Math.round((repuesto.stockActual / diaria) * 10) / 10 : null;
     const corte = new Date(`${entrada.fechaDeCorte}T00:00:00Z`);
     const lunes = new Date(corte.getTime() - ((corte.getUTCDay() + 6) % 7) * 86400000);
-    const puntoDeReorden = media > 0 ? Math.ceil(diaria * repuesto.diasDeReposicion) + 1 : 0;
+    const stockDeSeguridad = media > 0 ? 1 : 0;
+    const pronostico = Array.from({ length: entrada.horizonteSemanas }, (_, i) => ({
+      semana: new Date(lunes.getTime() + i * 7 * 86400000).toISOString().slice(0, 10),
+      unidades: media, inferior: Math.max(0, media - 1), superior: media + 1,
+    }));
+    const decision = aplicarPolitica({
+      pronostico: pronostico.map((punto) => punto.unidades),
+      primeraSemana: pronostico[0].semana,
+      hoy: entrada.fechaDeCorte,
+      stockActual: repuesto.stockActual,
+      diasDeReposicion: repuesto.diasDeReposicion,
+      stockDeSeguridad,
+    });
 
     return ajustar({
       id: repuesto.id,
@@ -40,22 +55,13 @@ function crearMotorSimulado({ ajustar = (prediccion) => prediccion, falla = null
       metricas: { rmsse: media > 0 ? 0.8 : null, wape: media > 0 ? 0.3 : null, sesgo: media > 0 ? 0.05 : null, mejoraSobreIngenuo: media > 0 ? 0.2 : null, semanasDePrueba: media > 0 ? 52 : 0 },
       comparados: media > 0 ? [{ modelo: 'MEDIA_MOVIL', modeloNombre: 'Media móvil de 8 semanas', rmsse: 0.8, wape: 0.3, sesgo: 0.05 }, { modelo: 'INGENUO', modeloNombre: 'Última semana', rmsse: 1, wape: 0.4, sesgo: 0 }] : [],
       errorSemanal: 1,
-      pronostico: Array.from({ length: entrada.horizonteSemanas }, (_, i) => ({
-        semana: new Date(lunes.getTime() + i * 7 * 86400000).toISOString().slice(0, 10),
-        unidades: media, inferior: Math.max(0, media - 1), superior: media + 1,
-      })),
+      pronostico,
       demandaTotal: media * entrada.horizonteSemanas,
       tendencia: 'ESTABLE',
       variacionTrimestral: 0,
       demandaDiaria: diaria,
-      demandaEnReposicion: diaria * repuesto.diasDeReposicion,
-      stockDeSeguridad: media > 0 ? 1 : 0,
-      puntoDeReorden,
-      cantidadSugerida: Math.max(0, Math.ceil(diaria * (repuesto.diasDeReposicion + 30)) - repuesto.stockActual),
-      debePedir: media > 0 && repuesto.stockActual <= puntoDeReorden,
-      diasDeCobertura: dias,
-      fechaDeQuiebre: dias === null ? null : new Date(corte.getTime() + Math.floor(dias) * 86400000).toISOString().slice(0, 10),
-      quiebreAntesDeReponer: dias !== null && dias < repuesto.diasDeReposicion,
+      stockDeSeguridad,
+      ...decision,
       aviso: media > 0 ? null : 'Sin consumo registrado: todavía no hay con qué pronosticar.',
       claseAbc: media > 0 ? 'A' : 'C',
       valorConsumoAnual: media * 52 * repuesto.costo,

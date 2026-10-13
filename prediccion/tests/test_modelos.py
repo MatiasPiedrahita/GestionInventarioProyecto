@@ -89,17 +89,37 @@ class TestEstacionalMensual:
 
         assert pronostico == pytest.approx(np.full(8, 7.0), rel=0.01)
 
-    def test_necesita_anio_y_medio_de_historia(self):
-        assert EstacionalMensual.semanas_minimas == 78
+    def test_se_ajusta_con_un_anio_de_historia(self):
+        assert EstacionalMensual.semanas_minimas == 52
 
-    def test_el_perfil_de_un_mes_solo_se_calcula_si_se_ha_visto_dos_veces(self):
-        def indice_de_diciembre(semanas):
-            valores = np.array([20.0 if s.month == 12 else 5.0 for s in semanas_hasta_el_corte(semanas)])
-            return ajustar(EstacionalMensual, valores)._indices[12]
+    def test_con_menos_de_seis_meses_vistos_no_arma_perfil(self):
+        # 20 semanas atrás desde octubre: solo se ven completos junio, julio, agosto y septiembre.
+        valores = np.array([20.0 if s.month == 6 else 5.0 for s in semanas_hasta_el_corte(20)])
 
-        # 100 semanas atrás desde octubre de 2026 incluyen diciembre de 2024 y de 2025; 80 semanas, solo el de 2025.
-        assert indice_de_diciembre(100) > 1.5
-        assert indice_de_diciembre(80) < 1.2, "un solo diciembre alto puede ser casualidad: no se toma como temporada"
+        assert ajustar(EstacionalMensual, valores)._indices[1:] == pytest.approx(np.ones(12))
+
+    def test_no_inventa_temporadas_donde_solo_hay_ruido(self, generador):
+        # Demanda al azar alrededor de 5 por semana, sin ninguna temporada.
+        valores = generador.poisson(5, 130).astype(float)
+
+        indices = ajustar(EstacionalMensual, valores)._indices[1:]
+
+        assert np.abs(indices - 1).max() < 0.15
+
+    def test_una_temporada_clara_casi_no_se_recorta(self, generador):
+        # Junio y diciembre piden el triple, con ruido encima.
+        fechas = semanas_hasta_el_corte(130)
+        valores = np.array([generador.poisson(18 if f.month in (6, 12) else 6) for f in fechas], dtype=float)
+
+        indices = ajustar(EstacionalMensual, valores)._indices
+
+        assert indices[12] / indices[11] > 2.5
+
+    def test_no_confunde_el_crecimiento_con_una_temporada(self):
+        # Crece de 2 a 18 sin temporadas: los meses del final de la historia no son "temporada alta".
+        indices = ajustar(EstacionalMensual, serie_con_tendencia(130))._indices[1:]
+
+        assert np.abs(indices - 1).max() < 0.1
 
 
 class TestDemandaIntermitente:

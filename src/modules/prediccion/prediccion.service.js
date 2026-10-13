@@ -2,6 +2,7 @@ const { ACCIONES } = require('../auditoria/acciones');
 const { SIN_AUDITORIA } = require('../auditoria/auditoria.service');
 const { ErrorDeValidacion, NoEncontrado, Conflicto } = require('../../shared/errors');
 const { comprasSugeridas, clasificacionAbc, sinMovimiento, precisionDelModelo, comprasEnCsv } = require('./reportes');
+const { aplicarPolitica } = require('./politica');
 
 const VERSION_DEL_CONTRATO = 1;
 const HORIZONTE_POR_DEFECTO = 8;
@@ -10,10 +11,12 @@ const SEMANAS_DE_HISTORIA = 156;
 const SEMANAS_EN_EL_GRAFICO = 104;
 const HORAS_DE_VIGENCIA = 24;
 const MINUTOS_PARA_DAR_POR_PERDIDA = 15;
+const MINUTOS_ENTRE_REINTENTOS = 60;
 const DIA_MS = 24 * 3600 * 1000;
 
 const aFechaSql = (fecha) => fecha.toISOString().slice(0, 19).replace('T', ' ');
 const aDia = (fecha) => fecha.toISOString().slice(0, 10);
+const deFechaSql = (texto) => Date.parse(`${texto.replace(' ', 'T')}Z`);
 
 /** Lunes (UTC) de la semana de la fecha. */
 function lunesDe(fecha) {
@@ -53,6 +56,23 @@ function redactarQuiebre(r, diasReposicion) {
 }
 
 /**
+ * Lleva una predicción guardada al día de hoy: el pronóstico es el que
+ * calculó el modelo, pero cuánto pedir, para cuántos días alcanza y cuándo
+ * se agota se recalculan con el stock y la fecha de este momento.
+ */
+function ponerAlDia(prediccion, puntos, hoy) {
+  const decision = aplicarPolitica({
+    pronostico: puntos.map((punto) => punto.unidades),
+    primeraSemana: puntos.length > 0 ? puntos[0].semana : null,
+    hoy,
+    stockActual: prediccion.repuesto.stockActual,
+    diasDeReposicion: prediccion.repuesto.diasReposicion,
+    stockDeSeguridad: prediccion.stockDeSeguridad,
+  });
+  return { ...prediccion, ...decision };
+}
+
+/**
  * Predicción de demanda (HU-09): prepara los datos, ejecuta el modelo de
  * Python, guarda los resultados y los conecta con las alertas.
  *
@@ -61,11 +81,24 @@ function redactarQuiebre(r, diasReposicion) {
  * sigue aparte; la interfaz consulta el estado hasta que termina. Solo
  * corre una ejecución a la vez.
  *
+ * Lo que se guarda de cada ejecución es el pronóstico. Las decisiones que
+ * dependen del stock (cuánto pedir, cuándo se agota) se recalculan cada vez
+ * que se consultan (ver politica.js): no esperan a la siguiente ejecución.
+ *
  * @param {{ consumo: object, repositorio: object, motor: { predecir: Function, descripcion: string },
- *           alertas?: object, auditoria?: object, ahora?: () => Date }} dependencias
+ *           alertas?: object, auditoria?: object, ahora?: () => Date, horasDeVigencia?: number }} dependencias
  */
-function crearServicioPrediccion({ consumo, repositorio, motor, alertas = null, auditoria = SIN_AUDITORIA, ahora = () => new Date() }) {
+function crearServicioPrediccion({
+  consumo, repositorio, motor, alertas = null, auditoria = SIN_AUDITORIA, ahora = () => new Date(), horasDeVigencia = HORAS_DE_VIGENCIA,
+}) {
   let tareaEnCurso = Promise.resolve();
+
+  /** Las predicciones de una ejecución, con sus decisiones calculadas para el stock de hoy. */
+  function prediccionesAlDia(ejecucion) {
+    const puntos = repositorio.listarPuntos(ejecucion.id);
+    const hoy = aDia(ahora());
+    return repositorio.listarPredicciones(ejecucion.id).map((p) => ponerAlDia(p, puntos.get(p.id) || [], hoy));
+  }
 
   /** Arma la entrada del contrato y recuerda con qué stock y qué tiempo de reposición se calculó cada repuesto. */
   function prepararDatos({ horizonteSemanas, nivelDeServicio }, momento) {
@@ -105,21 +138,13 @@ function crearServicioPrediccion({ consumo, repositorio, motor, alertas = null, 
     return validos;
   }
 
-  /** Lo que la predicción le aporta a las alertas: repuestos que se agotarían antes de poder reponerlos. */
-  function avisarQuiebresProyectados(predicciones, contexto) {
-    if (!alertas) return;
-    const proyectados = predicciones
-      .filter((r) => r.quiebreAntesDeReponer && r.demandaTotal > 0 && r.diasDeCobertura !== null)
-      .map((r) => ({ repuestoId: r.id, detalle: redactarQuiebre(r, contexto.get(r.id).diasReposicion) }));
-    alertas.sincronizarProyectadas(proyectados);
-  }
-
   async function correr(ejecucionId, entrada, contexto) {
     const inicio = Date.now();
     try {
       const resultado = await motor.predecir(entrada);
-      const guardadas = guardar(ejecucionId, resultado, contexto, Date.now() - inicio);
-      avisarQuiebresProyectados(guardadas, contexto);
+      guardar(ejecucionId, resultado, contexto, Date.now() - inicio);
+      // Con el pronóstico nuevo, las alertas vuelven a mirar qué repuestos se agotarían antes de poder reponerlos.
+      if (alertas) alertas.revisar();
     } catch (error) {
       repositorio.fallarEjecucion(ejecucionId, { duracionMs: Date.now() - inicio, error: error.message || String(error) });
       if (process.env.NODE_ENV !== 'test') console.error('La predicción de demanda falló:', error.message, error.detalle || '');
@@ -171,13 +196,24 @@ function crearServicioPrediccion({ consumo, repositorio, motor, alertas = null, 
       await tareaEnCurso;
     },
 
-    /** Para la tarea programada: recalcula solo si la última predicción ya tiene más de un día. */
+    /**
+     * Para la tarea programada, que pregunta cada pocos minutos. Recalcula si la
+     * última predicción ya venció, o si el catálogo cambió desde entonces (un
+     * repuesto nuevo, o uno al que le cambiaron el tiempo de reposición).
+     */
     async ejecutarSiHaceFalta() {
-      const ultima = repositorio.ultimaEjecucionCompletada();
-      const vigente = ultima && ahora().getTime() - Date.parse(`${ultima.finalizadaEn.replace(' ', 'T')}Z`) < HORAS_DE_VIGENCIA * 3600 * 1000;
-      if (vigente) return { ejecutada: false, motivo: 'La predicción vigente tiene menos de un día' };
+      const momento = ahora().getTime();
+      const completada = repositorio.ultimaEjecucionCompletada();
+      const reciente = completada && momento - deFechaSql(completada.finalizadaEn) < horasDeVigencia * 3600 * 1000;
+      const pendientes = completada ? repositorio.contarPendientes(completada.id) : 0;
+      if (reciente && pendientes === 0) return { ejecutada: false, motivo: 'La predicción está vigente' };
       if (repositorio.ejecucionEnCurso()) return { ejecutada: false, motivo: 'Ya hay una ejecución en curso' };
       if (consumo.listarRepuestos().length === 0) return { ejecutada: false, motivo: 'No hay repuestos en el catálogo' };
+      // Si el último intento falló hace poco, no se insiste en cada vuelta: el historial se llenaría de fallos iguales.
+      const ultima = repositorio.ultimaEjecucion();
+      if (ultima && ultima.estado === 'FALLIDA' && momento - deFechaSql(ultima.iniciadaEn) < MINUTOS_ENTRE_REINTENTOS * 60000) {
+        return { ejecutada: false, motivo: 'El último intento falló hace menos de una hora' };
+      }
       // Sin Python instalado no se llena el historial de ejecuciones fallidas en cada arranque.
       if (typeof motor.comprobar === 'function') {
         const { disponible, motivo } = await motor.comprobar();
@@ -208,13 +244,17 @@ function crearServicioPrediccion({ consumo, repositorio, motor, alertas = null, 
       return repositorio.listarEjecuciones(12);
     },
 
-    /** La última predicción completa: la ejecución y el resultado de cada repuesto. */
+    /**
+     * La última predicción completa: la ejecución y el resultado de cada repuesto, con las decisiones al día.
+     * `pendientes` son los repuestos activos que esa ejecución no cubre (nuevos, o con otro tiempo de reposición).
+     */
     resumen() {
       const ejecucion = repositorio.ultimaEjecucionCompletada();
-      if (!ejecucion) return { ejecucion: null, predicciones: [], enCurso: repositorio.ejecucionEnCurso() };
+      if (!ejecucion) return { ejecucion: null, predicciones: [], pendientes: 0, enCurso: repositorio.ejecucionEnCurso() };
       return {
         ejecucion,
-        predicciones: repositorio.listarPredicciones(ejecucion.id).filter((p) => p.repuesto.activo),
+        predicciones: prediccionesAlDia(ejecucion).filter((p) => p.repuesto.activo),
+        pendientes: repositorio.contarPendientes(ejecucion.id),
         enCurso: repositorio.ejecucionEnCurso(),
       };
     },
@@ -222,8 +262,9 @@ function crearServicioPrediccion({ consumo, repositorio, motor, alertas = null, 
     /** Predicción de un repuesto con su pronóstico semanal y la historia de consumo, para dibujar el gráfico. */
     detalle(repuestoId) {
       const ejecucion = exigirResultados();
-      const prediccion = repositorio.buscarPrediccion(ejecucion.id, repuestoId);
-      if (!prediccion) throw new NoEncontrado('Este repuesto todavía no tiene predicción. Ejecútela de nuevo para incluirlo.');
+      const guardada = repositorio.buscarPrediccion(ejecucion.id, repuestoId);
+      if (!guardada) throw new NoEncontrado('Este repuesto todavía no tiene predicción. Ejecútela de nuevo para incluirlo.');
+      const prediccion = ponerAlDia(guardada, guardada.pronostico, aDia(ahora()));
 
       // Historia semanal con las semanas sin consumo en cero, hasta la última semana completa antes del corte.
       const corte = lunesDe(new Date(`${ejecucion.fechaDeCorte}T00:00:00Z`));
@@ -241,7 +282,7 @@ function crearServicioPrediccion({ consumo, repositorio, motor, alertas = null, 
     /** Reportes de la última predicción: compras sugeridas, clasificación ABC, repuestos sin movimiento y precisión del modelo. */
     reportes() {
       const ejecucion = exigirResultados();
-      const predicciones = repositorio.listarPredicciones(ejecucion.id).filter((p) => p.repuesto.activo);
+      const predicciones = prediccionesAlDia(ejecucion).filter((p) => p.repuesto.activo);
       return {
         ejecucion,
         compras: comprasSugeridas(predicciones),
@@ -257,26 +298,31 @@ function crearServicioPrediccion({ consumo, repositorio, motor, alertas = null, 
       return { nombre: `compras-sugeridas-${ejecucion.fechaDeCorte}.csv`, contenido: comprasEnCsv(compras) };
     },
 
-    /** @returns {Map<number, object>} Lo que la última predicción sugiere para cada repuesto (lo usan las alertas). */
+    /**
+     * Lo que la última predicción sugiere hoy para cada repuesto (lo usan las alertas).
+     * `quiebreProyectado` trae la explicación cuando el repuesto se agotaría antes de
+     * que alcance a llegar un pedido; null si el stock alcanza.
+     * @returns {Map<number, object>}
+     */
     sugerencias() {
       const ejecucion = repositorio.ultimaEjecucionCompletada();
       if (!ejecucion) return new Map();
-      return new Map(repositorio.listarPredicciones(ejecucion.id).map((p) => [p.repuesto.id, {
+      return new Map(prediccionesAlDia(ejecucion).map((p) => [p.repuesto.id, {
         cantidadSugerida: p.cantidadSugerida,
         puntoDeReorden: p.puntoDeReorden,
         diasDeCobertura: p.diasDeCobertura,
         fechaDeQuiebre: p.fechaDeQuiebre,
         debePedir: p.debePedir,
+        quiebreProyectado: p.quiebreAntesDeReponer && p.demandaTotal > 0 && p.diasDeCobertura !== null
+          ? redactarQuiebre(p, p.repuesto.diasReposicion)
+          : null,
         calculadaEn: ejecucion.finalizadaEn,
       }]));
     },
 
     /** Punto de reorden que la última predicción sugiere como stock mínimo de un repuesto. */
     minimoSugerido(repuestoId) {
-      const ejecucion = exigirResultados();
-      const prediccion = repositorio.buscarPrediccion(ejecucion.id, repuestoId);
-      if (!prediccion) throw new NoEncontrado('Este repuesto todavía no tiene predicción');
-      return prediccion.puntoDeReorden;
+      return this.detalle(repuestoId).puntoDeReorden;
     },
 
     /** Sección "prediccion" del estado del sistema. */
@@ -291,4 +337,4 @@ function crearServicioPrediccion({ consumo, repositorio, motor, alertas = null, 
   };
 }
 
-module.exports = { crearServicioPrediccion, validarParametros, redactarQuiebre, lunesDe };
+module.exports = { crearServicioPrediccion, validarParametros, redactarQuiebre, ponerAlDia, lunesDe };

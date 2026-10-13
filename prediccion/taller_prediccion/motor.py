@@ -110,6 +110,9 @@ def _pronosticar_repuesto(repuesto: Repuesto, entrada: Entrada) -> dict:
         elif mejora is not None and mejora <= 0:
             aviso = "Ningún modelo pronostica mejor que repetir la última semana: tome el pronóstico como una orientación."
 
+    # La política se calcula con el pronóstico tal como se publica (dos decimales): la aplicación
+    # la repite después con esos mismos números y el stock del día, y debe llegar al mismo resultado.
+    pronostico = np.round(pronostico, 2)
     tendencia, variacion = _tendencia(valores)
     sigma = float(np.sqrt(np.mean(np.square(errores)))) if len(errores) else (float(valores.std()) if len(valores) else 0.0)
     inferior, superior = _intervalo(pronostico, errores, sigma)
